@@ -419,7 +419,7 @@ ZPOOL_STATUS=$(env LC_ALL=C zpool status 2>&1 ) \
 
 
 ZFS_LIST=$(env LC_ALL=C zfs list -H -t filesystem,volume -s name \
-  -o name,com.sun:auto-snapshot,com.sun:auto-snapshot:"$opt_label") \
+  -o name,com.sun:auto-snapshot${opt_label:+,com.sun:auto-snapshot:"$opt_label"}) \
   || { print_log error "zfs list $?: $ZFS_LIST"; exit 136; }
 
 if [ -n "$opt_fast_zfs_list" ]
@@ -460,20 +460,38 @@ ZPOOLS_NOTREADY=($(echo "$ZPOOL_STATUS" | awk -F ': ' \
   | sort))
 
 # Get a list of datasets for which snapshots are explicitly disabled.
-NOAUTO=($(echo "$ZFS_LIST" | awk -F '\t' \
-  'tolower($2) ~ /false/ || tolower($3) ~ /false/ {print $1}'))
+if [ -n "$opt_label" ]
+then
+	NOAUTO=($(echo "$ZFS_LIST" | awk -F '\t' \
+	  'tolower($2) ~ /false/ || tolower($3) ~ /false/ {print $1}'))
+else
+	NOAUTO=($(echo "$ZFS_LIST" | awk -F '\t' \
+	  'tolower($2) ~ /false/ {print $1}'))
+fi
 
 # If the --default-include flag is set, then include all datasets that lack
 # an explicit com.sun:auto-snapshot* property. Otherwise, exclude them.
 if [ -z "$opt_default_include" ]
 then
 	# Get a list of datasets for which snapshots are explicitly enabled.
-	CANDIDATES=($(echo "$ZFS_LIST" | awk -F '\t' \
-	  'tolower($2) ~ /true/ && tolower($3) ~ /true/ {print $1}'))
+	if [ -n "$opt_label" ]
+	then
+		CANDIDATES=($(echo "$ZFS_LIST" | awk -F '\t' \
+		  'tolower($2) ~ /true/ && tolower($3) ~ /true/ {print $1}'))
+	else
+		CANDIDATES=($(echo "$ZFS_LIST" | awk -F '\t' \
+		  'tolower($2) ~ /true/ {print $1}'))
+	fi
 else
 	# Get a list of datasets for which snapshots are not explicitly disabled.
-	CANDIDATES=($(echo "$ZFS_LIST" | awk -F '\t' \
-	  'tolower($2) !~ /false/ && tolower($3) !~ /false/ {print $1}'))
+	if [ -n "$opt_label" ]
+	then
+		CANDIDATES=($(echo "$ZFS_LIST" | awk -F '\t' \
+		  'tolower($2) !~ /false/ && tolower($3) !~ /false/ {print $1}'))
+	else
+		CANDIDATES=($(echo "$ZFS_LIST" | awk -F '\t' \
+		  'tolower($2) !~ /false/ {print $1}'))
+	fi
 fi
 
 # Initialize the list of datasets that will get a recursive snapshot.
