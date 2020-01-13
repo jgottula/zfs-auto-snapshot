@@ -317,7 +317,7 @@ do
 			while test "${#opt_prefix}" -gt '0'
 			do
 				case $opt_prefix in
-					([![:alnum:]_.:\ -]*)
+					([![:alnum:]_.:-]*)
 						print_log error "The $1 parameter must be alphanumeric."
 						exit 130
 						;;
@@ -339,7 +339,7 @@ do
 			;;
 		(--sep)
 			case "$2" in
-				([[:alnum:]_.:\ -])
+				([[:alnum:]_.:-])
 					:
 					;;
 				('')
