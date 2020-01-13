@@ -28,7 +28,8 @@ opt_backup_full=''
 opt_backup_incremental=''
 opt_default_include=''
 opt_dry_run=''
-opt_event='-'
+opt_event_is_set=''
+opt_event=''
 opt_fast_zfs_list=''
 opt_keep=''
 opt_label=''
@@ -265,10 +266,9 @@ do
 			then
 				print_log error "The $1 parameter must be less than 1025 characters."
 				exit 139
-			elif [ "${#2}" -gt '0' ]
-			then
-				opt_event="$2"
 			fi
+			opt_event_is_set='1'
+			opt_event="$2"
 			shift 2
 			;;
 		(--fast)
@@ -569,9 +569,14 @@ do
 	TARGETS_RECURSIVE="${TARGETS_RECURSIVE:+$TARGETS_RECURSIVE	}$ii" # nb: \t
 done
 
-# Linux lacks SMF and the notion of an FMRI event, but always set this property
-# because the SUNW program does. The dash character is the default.
-SNAPPROP="-o com.sun:auto-snapshot-desc='$opt_event'"
+# Only actually set the com.sun:auto-snapshot-desc property if we were
+# explicitly given a value to use (which can be ''); otherwise, don't set it.
+if [ -n "$opt_event_is_set" ]
+then
+	SNAPPROP="-o com.sun:auto-snapshot-desc='$opt_event'"
+else
+	SNAPPROP=""
+fi
 
 # ISO style date; fifteen characters: YYYY-MM-DD-HHMM
 # On Solaris %H%M expands to 12h34.

@@ -21,7 +21,9 @@ without \fBcom.sun:auto-snapshot\fR are included as well.
 Print debugging messages.
 .TP
 \fB\-e\fR, \fB\-\-event\fR=\fIEVENT\fR
-Set the com.sun:auto\-snapshot\-desc property to EVENT.
+Set the com.sun:auto\-snapshot\-desc property to EVENT. If this
+option is omitted, then the property will not be set at all.
+(Non-standard behavior.)
 .TP
 \fB\-\-fast\fR
 Use a faster zfs list invocation.
