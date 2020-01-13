@@ -402,26 +402,12 @@ ZFS_LIST=$(env LC_ALL=C zfs list -H -t filesystem,volume -s name \
 
 if [ -n "$opt_fast_zfs_list" ]
 then
-	# Check if a snapshot label is being used, in which case restrict the old
-	# snapshot removal to only snapshots with the same label format
-	if [ -n "$opt_label" ]
-	then
-		SNAPSHOTS_OLD=$(env LC_ALL=C zfs list -H -t snapshot -o name -s name | \
-			grep "$opt_prefix"_"$opt_label" | \
-			awk '{ print substr( $0, length($0) - 14, length($0) ) " " $0}' | \
-			sort -r -k1,1 -k2,2 | \
-			awk '{ print substr( $0, 17, length($0) )}') \
-	  	|| { print_log error "zfs list $?: $SNAPSHOTS_OLD"; exit 137; }
-	else
- 		SNAPSHOTS_OLD=$(env LC_ALL=C zfs list -H -t snapshot -o name -s name | \
-			grep $opt_prefix | \
-			awk '{ print substr( $0, length($0) - 14, length($0) ) " " $0}' | \
-			sort -r -k1,1 -k2,2 | \
-			awk '{ print substr( $0, 17, length($0) )}') \
-	  	|| { print_log error "zfs list $?: $SNAPSHOTS_OLD"; exit 137; }
-	fi
+	SNAPSHOTS_OLD=$(env LC_ALL=C zfs list -H -t snapshot -o name -s name | \
+	  grep -P '@'"${opt_prefix:+$opt_prefix$opt_sep}"'\d{4}-\d{2}-\d{2}-\d{4}'"${opt_label:+$opt_sep$opt_label}" | \
+	  sort -t'@' -k2r,2 -k1,1) \
+	  || { print_log error "zfs list $?: $SNAPSHOTS_OLD"; exit 137; }
 else
-        SNAPSHOTS_OLD=$(env LC_ALL=C zfs list -H -t snapshot -S creation -o name) \
+	SNAPSHOTS_OLD=$(env LC_ALL=C zfs list -H -t snapshot -S creation -o name) \
 	  || { print_log error "zfs list $?: $SNAPSHOTS_OLD"; exit 137; }
 fi
 
@@ -588,10 +574,10 @@ SNAPPROP="-o com.sun:auto-snapshot-desc='$opt_event'"
 DATE=$(date -u +%F-%H%M)
 
 # The snapshot name after the @ symbol.
-SNAPNAME="${opt_prefix:+$opt_prefix$opt_sep}${opt_label:+$opt_label}-$DATE"
+SNAPNAME="${opt_prefix:+$opt_prefix$opt_sep}$DATE${opt_label:+$opt_sep$opt_label}"
 
-# The expression for matching old snapshots.  -YYYY-MM-DD-HHMM
-SNAPGLOB="${opt_prefix:+$opt_prefix$opt_sep}${opt_label:+$opt_label}-???????????????"
+# The expression for matching old snapshots.  YYYY-MM-DD-HHMM
+SNAPGLOB="${opt_prefix:+$opt_prefix$opt_sep}????-??-??-????${opt_label:+$opt_sep$opt_label}"
 
 if [ -n "$opt_do_snapshots" ]
 then
