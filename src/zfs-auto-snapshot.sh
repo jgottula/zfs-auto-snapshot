@@ -304,6 +304,11 @@ do
 			shift 2
 			;;
 		(-m|--min-size)
+			if ! test "$2" -ge '0' 2>/dev/null
+			then
+				print_log error "The $1 parameter must be a nonnegative integer."
+				exit 201
+			fi
 			opt_min_size="$2"
 			shift 2
 			;;
