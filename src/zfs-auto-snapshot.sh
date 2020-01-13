@@ -425,7 +425,7 @@ ZFS_LIST=$(env LC_ALL=C zfs list -H -t filesystem,volume -s name \
 if [ -n "$opt_fast_zfs_list" ]
 then
 	SNAPSHOTS_OLD=($(env LC_ALL=C zfs list -H -t snapshot -o name -s name | \
-	  grep -P '@'"${opt_prefix:+$opt_prefix$opt_sep}"'\d{4}-\d{2}-\d{2}-\d{4}'"${opt_label:+$opt_sep$opt_label}" | \
+	  grep -P '@'"${opt_prefix:+${opt_prefix//./\\.}${opt_sep//./\\.}}"'\d{4}-\d{2}-\d{2}-\d{4}'"${opt_label:+${opt_sep//./\\.}${opt_label//./\\.}}"'$' | \
 	  sort -t'@' -k2r,2 -k1,1)) \
 	  || { print_log error "zfs list $?: $SNAPSHOTS_OLD"; exit 137; }
 else
