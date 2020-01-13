@@ -63,7 +63,7 @@ RE_VALID='^[[:alnum:]-_.:]*$'
 
 print_usage ()
 {
-	echo "Usage: $0 [options] [-l label] <'//' | name [name...]>
+	echo "Usage: zfs-auto-snapshot [options] [-l label] <'//' | name [name...]>
 
   --default-include  Include datasets if com.sun:auto-snapshot is unset.
   -d, --debug        Print debugging messages.
