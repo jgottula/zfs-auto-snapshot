@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/zsh
 
 # zfs-auto-snapshot for Linux
 # Automatically create, rotate, and destroy periodic ZFS snapshots.
@@ -18,6 +18,9 @@
 # this program; if not, write to the Free Software Foundation, Inc., 59 Temple
 # Place, Suite 330, Boston, MA  02111-1307  USA
 #
+
+# ZSH: enable PCRE regex
+set -o rematchpcre
 
 # Set the field separator to a literal tab and newline.
 IFS="	
@@ -157,7 +160,7 @@ do_snapshots () # properties, flags, snapname, oldglob, [targets...]
 	local FLAGS="$2"
 	local NAME="$3"
 	local GLOB="$4"
-	local TARGETS="$5"
+	local TARGETS=("${@:5}")
 	local KEEP=''
 	local RUNSNAP=1
 
@@ -166,7 +169,7 @@ do_snapshots () # properties, flags, snapname, oldglob, [targets...]
 	# global WARNING_COUNT
 	# global SNAPSHOTS_OLD
 
-	for ii in $TARGETS
+	for ii in "${TARGETS[@]}"
 	do
                 # Check if size check is > 0
                 size_check_skip=0
@@ -206,7 +209,7 @@ do_snapshots () # properties, flags, snapname, oldglob, [targets...]
 		KEEP="$opt_keep"
 
 		# ASSERT: The old snapshot list is sorted by increasing age.
-		for jj in $SNAPSHOTS_OLD
+		for jj in "${SNAPSHOTS_OLD[@]}"
 		do
 			# Check whether this is an old snapshot of the filesystem.
 			if [ -z "${jj#$ii@$GLOB}" ]
@@ -407,12 +410,12 @@ ZFS_LIST=$(env LC_ALL=C zfs list -H -t filesystem,volume -s name \
 
 if [ -n "$opt_fast_zfs_list" ]
 then
-	SNAPSHOTS_OLD=$(env LC_ALL=C zfs list -H -t snapshot -o name -s name | \
+	SNAPSHOTS_OLD=($(env LC_ALL=C zfs list -H -t snapshot -o name -s name | \
 	  grep -P '@'"${opt_prefix:+$opt_prefix$opt_sep}"'\d{4}-\d{2}-\d{2}-\d{4}'"${opt_label:+$opt_sep$opt_label}" | \
-	  sort -t'@' -k2r,2 -k1,1) \
+	  sort -t'@' -k2r,2 -k1,1)) \
 	  || { print_log error "zfs list $?: $SNAPSHOTS_OLD"; exit 137; }
 else
-	SNAPSHOTS_OLD=$(env LC_ALL=C zfs list -H -t snapshot -S creation -o name) \
+	SNAPSHOTS_OLD=($(env LC_ALL=C zfs list -H -t snapshot -S creation -o name)) \
 	  || { print_log error "zfs list $?: $SNAPSHOTS_OLD"; exit 137; }
 fi
 
@@ -431,41 +434,41 @@ do
 done
 
 # Get a list of pools that are being scrubbed.
-ZPOOLS_SCRUBBING=$(echo "$ZPOOL_STATUS" | awk -F ': ' \
+ZPOOLS_SCRUBBING=($(echo "$ZPOOL_STATUS" | awk -F ': ' \
   '$1 ~ /^ *pool$/ { pool = $2 } ; \
    $1 ~ /^ *scan$/ && $2 ~ /scrub in progress/ { print pool }' \
-  | sort ) 
+  | sort))
 
 # Get a list of pools that cannot do a snapshot.
-ZPOOLS_NOTREADY=$(echo "$ZPOOL_STATUS" | awk -F ': ' \
+ZPOOLS_NOTREADY=($(echo "$ZPOOL_STATUS" | awk -F ': ' \
   '$1 ~ /^ *pool$/ { pool = $2 } ; \
    $1 ~ /^ *state$/ && $2 !~ /ONLINE|DEGRADED/ { print pool } ' \
-  | sort)
+  | sort))
 
 # Get a list of datasets for which snapshots are explicitly disabled.
-NOAUTO=$(echo "$ZFS_LIST" | awk -F '\t' \
-  'tolower($2) ~ /false/ || tolower($3) ~ /false/ {print $1}')
+NOAUTO=($(echo "$ZFS_LIST" | awk -F '\t' \
+  'tolower($2) ~ /false/ || tolower($3) ~ /false/ {print $1}'))
 
 # If the --default-include flag is set, then include all datasets that lack
 # an explicit com.sun:auto-snapshot* property. Otherwise, exclude them.
 if [ -z "$opt_default_include" ]
 then
 	# Get a list of datasets for which snapshots are explicitly enabled.
-	CANDIDATES=$(echo "$ZFS_LIST" | awk -F '\t' \
-	  'tolower($2) ~ /true/ && tolower($3) ~ /true/ {print $1}')
+	CANDIDATES=($(echo "$ZFS_LIST" | awk -F '\t' \
+	  'tolower($2) ~ /true/ && tolower($3) ~ /true/ {print $1}'))
 else
 	# Get a list of datasets for which snapshots are not explicitly disabled.
-	CANDIDATES=$(echo "$ZFS_LIST" | awk -F '\t' \
-	  'tolower($2) !~ /false/ && tolower($3) !~ /false/ {print $1}')
+	CANDIDATES=($(echo "$ZFS_LIST" | awk -F '\t' \
+	  'tolower($2) !~ /false/ && tolower($3) !~ /false/ {print $1}'))
 fi
 
 # Initialize the list of datasets that will get a recursive snapshot.
-TARGETS_RECURSIVE=''
+TARGETS_RECURSIVE=()
 
 # Initialize the list of datasets that will get a non-recursive snapshot.
-TARGETS_REGULAR=''
+TARGETS_REGULAR=()
 
-for ii in $CANDIDATES
+for ii in "${CANDIDATES[@]}"
 do
 	# Qualify dataset names so variable globbing works properly.
 	# Suppose ii=tanker/foo and jj=tank sometime during the loop.
@@ -496,7 +499,7 @@ do
 	fi
 
 	# Exclude datasets in pools that cannot do a snapshot.
-	for jj in $ZPOOLS_NOTREADY
+	for jj in "${ZPOOLS_NOTREADY[@]}"
 	do
 		# Ibid regarding iii.
 		jjj="$jj/"
@@ -510,7 +513,7 @@ do
 	done
 
 	# Exclude datasets in scrubbing pools if the --skip-scrub flag is set.
-	test -n "$opt_skip_scrub" && for jj in $ZPOOLS_SCRUBBING
+	test -n "$opt_skip_scrub" && for jj in "${ZPOOLS_SCRUBBING[@]}"
 	do
 		# Ibid regarding iii.
 		jjj="$jj/"
@@ -523,7 +526,7 @@ do
 		fi
 	done
 
-	for jj in $NOAUTO
+	for jj in "${NOAUTO[@]}"
 	do
 		# Ibid regarding iii.
 		jjj="$jj/"
@@ -533,19 +536,19 @@ do
 		then
 			# Snapshot this dataset non-recursively.
 			print_log debug "Including $ii for regular snapshot."
-			TARGETS_REGULAR="${TARGETS_REGULAR:+$TARGETS_REGULAR	}$ii" # nb: \t
+			TARGETS_REGULAR+=("$ii")
 			continue 2
 		# Check whether the candidate name is a prefix of any excluded dataset name.
 		elif [ "$jjj" != "${jjj#$iii}" ]
 		then
 			# Snapshot this dataset non-recursively.
 			print_log debug "Including $ii for regular snapshot."
-			TARGETS_REGULAR="${TARGETS_REGULAR:+$TARGETS_REGULAR	}$ii" # nb: \t
+			TARGETS_REGULAR+=("$ii")
 			continue 2
 		fi
 	done
 
-	for jj in $TARGETS_RECURSIVE
+	for jj in "${TARGETS_RECURSIVE[@]}"
 	do
 		# Ibid regarding iii.
 		jjj="$jj/"
@@ -566,7 +569,7 @@ do
 	#   * Is not the descendant of an already included filesystem.
 	#
 	print_log debug "Including $ii for recursive snapshot."
-	TARGETS_RECURSIVE="${TARGETS_RECURSIVE:+$TARGETS_RECURSIVE	}$ii" # nb: \t
+	TARGETS_RECURSIVE+=("$ii")
 done
 
 # Only actually set the com.sun:auto-snapshot-desc property if we were
@@ -592,10 +595,10 @@ SNAPGLOB="${opt_prefix:+$opt_prefix$opt_sep}????-??-??-????${opt_label:+$opt_sep
 if [ -n "$opt_do_snapshots" ]
 then
 	test -n "$TARGETS_REGULAR" \
-	  && print_log info "Doing regular snapshots of $TARGETS_REGULAR"
+	  && print_log info "Doing regular snapshots of ${TARGETS_REGULAR[@]}"
 
 	test -n "$TARGETS_RECURSIVE" \
-	  && print_log info "Doing recursive snapshots of $TARGETS_RECURSIVE"
+	  && print_log info "Doing recursive snapshots of ${TARGETS_RECURSIVE[@]}"
 
 	if test -n "$opt_keep" && [ "$opt_keep" -ge "1" ]
 	then
@@ -604,10 +607,10 @@ then
 elif test -n "$opt_keep" && [ "$opt_keep" -ge "1" ]
 then
 	test -n "$TARGETS_REGULAR" \
-	  && print_log info "Destroying all but the newest $opt_keep snapshots of $TARGETS_REGULAR"
+	  && print_log info "Destroying all but the newest $opt_keep snapshots of ${TARGETS_REGULAR[@]}"
 
 	test -n "$TARGETS_RECURSIVE" \
-	  && print_log info "Recursively destroying all but the newest $opt_keep snapshots of $TARGETS_RECURSIVE"
+	  && print_log info "Recursively destroying all but the newest $opt_keep snapshots of ${TARGETS_RECURSIVE[@]}"
 else
 	print_log notice "Only destroying snapshots, but count of snapshots to preserve not given. Nothing to do."
 fi
@@ -615,8 +618,8 @@ fi
 test -n "$opt_dry_run" \
   && print_log info "Doing a dry run. Not running these commands..."
 
-do_snapshots "$SNAPPROP" ""   "$SNAPNAME" "$SNAPGLOB" "$TARGETS_REGULAR"
-do_snapshots "$SNAPPROP" "-r" "$SNAPNAME" "$SNAPGLOB" "$TARGETS_RECURSIVE"
+do_snapshots "$SNAPPROP" ""   "$SNAPNAME" "$SNAPGLOB" "${TARGETS_REGULAR[@]}"
+do_snapshots "$SNAPPROP" "-r" "$SNAPNAME" "$SNAPGLOB" "${TARGETS_RECURSIVE[@]}"
 
 print_log notice "@$SNAPNAME," \
   "$SNAPSHOT_COUNT created," \
