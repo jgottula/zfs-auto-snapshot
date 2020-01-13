@@ -301,6 +301,17 @@ do
 			;;
 		(-l|--label)
 			opt_label="$2"
+			while test "${#opt_label}" -gt '0'
+			do
+				case $opt_label in
+					([![:alnum:]_.:-]*)
+						print_log error "The $1 parameter must be alphanumeric."
+						exit 202
+						;;
+				esac
+				opt_label="${opt_label#?}"
+			done
+			opt_label="$2"
 			shift 2
 			;;
 		(-m|--min-size)
