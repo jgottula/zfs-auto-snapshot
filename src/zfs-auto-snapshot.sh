@@ -36,7 +36,7 @@ opt_event=''
 opt_fast_zfs_list=''
 opt_keep=''
 opt_label=''
-opt_prefix='zfs-auto-snap'
+opt_prefix='auto'
 opt_recursive=''
 opt_sep='_'
 opt_setauto=''
@@ -74,7 +74,7 @@ print_usage ()
   -h, --help         Print this usage message.
   -k, --keep=NUM     Keep NUM recent snapshots and destroy older snapshots.
   -l, --label=LAB    LAB is usually 'hourly', 'daily', or 'monthly'.
-  -p, --prefix=PRE   PRE is 'zfs-auto-snap' by default.
+  -p, --prefix=PRE   PRE is 'auto' by default.
   -q, --quiet        Suppress warnings and notices at the console.
       --send-full=F  Send zfs full backup. Unimplemented.
       --send-incr=F  Send zfs incremental backup. Unimplemented.
