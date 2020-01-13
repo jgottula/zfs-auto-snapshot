@@ -10,11 +10,12 @@ automatically creates, rotates, and destroys snapshots for all your
 ZFS datasets, and is compatible with both zfsonlinux and zfs-fuse.
 .SH OPTIONS
 .TP
-\fB\-\-default\-exclude\fR
-By default \fBzfs-auto-snapshot\fR will snapshot all datasets except
-for those in which the user-property \fBcom.sun:auto-snapshot\fR is
-set to \fBfalse\fR.  This option reverses the behavior and requires
-\fBcom.sun:auto-snapshot\fR to be set to \fBtrue\fR.
+\fB\-\-default\-include\fR
+By default \fBzfs-auto-snapshot\fB will snapshot all datasets in
+which the user-property \fBcom.sun:auto-snapshot\fR is set to
+\fBtrue\fR.  This option reverses the behavior, so that datasets
+without \fBcom.sun:auto-snapshot\fR are included as well.
+(Non-standard behavior.)
 .TP
 \fB\-d\fR, \fB\-\-debug\fR
 Print debugging messages.

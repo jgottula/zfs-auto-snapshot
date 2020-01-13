@@ -26,7 +26,7 @@ IFS="
 # Set default program options.
 opt_backup_full=''
 opt_backup_incremental=''
-opt_default_exclude=''
+opt_default_include=''
 opt_dry_run=''
 opt_event='-'
 opt_fast_zfs_list=''
@@ -57,7 +57,7 @@ print_usage ()
 {
 	echo "Usage: $0 [options] [-l label] <'//' | name [name...]>
 
-  --default-exclude  Exclude datasets if com.sun:auto-snapshot is unset.
+  --default-include  Include datasets if com.sun:auto-snapshot is unset.
   -d, --debug        Print debugging messages.
   -e, --event=EVENT  Set the com.sun:auto-snapshot-desc property to EVENT.
       --fast         Use a faster zfs list invocation.
@@ -236,7 +236,7 @@ else
 fi
 
 GETOPT=$($GETOPT_BIN \
-  --longoptions=default-exclude,dry-run,fast,skip-scrub,recursive \
+  --longoptions=default-include,dry-run,fast,skip-scrub,recursive \
   --longoptions=event:,keep:,label:,prefix:,sep: \
   --longoptions=debug,help,quiet,syslog,verbose \
   --longoptions=pre-snapshot:,post-snapshot:,destroy-only \
@@ -256,8 +256,8 @@ do
 			opt_verbose='1'
 			shift 1
 			;;
-		(--default-exclude)
-			opt_default_exclude='1'
+		(--default-include)
+			opt_default_include='1'
 			shift 1
 			;;
 		(-e|--event)
@@ -446,15 +446,15 @@ ZPOOLS_NOTREADY=$(echo "$ZPOOL_STATUS" | awk -F ': ' \
 NOAUTO=$(echo "$ZFS_LIST" | awk -F '\t' \
   'tolower($2) ~ /false/ || tolower($3) ~ /false/ {print $1}')
 
-# If the --default-exclude flag is set, then exclude all datasets that lack
-# an explicit com.sun:auto-snapshot* property. Otherwise, include them.
-if [ -n "$opt_default_exclude" ]
+# If the --default-include flag is set, then include all datasets that lack
+# an explicit com.sun:auto-snapshot* property. Otherwise, exclude them.
+if [ -z "$opt_default_include" ]
 then
 	# Get a list of datasets for which snapshots are explicitly enabled.
 	CANDIDATES=$(echo "$ZFS_LIST" | awk -F '\t' \
-	  'tolower($2) ~ /true/ || tolower($3) ~ /true/ {print $1}')
+	  'tolower($2) ~ /true/ && tolower($3) ~ /true/ {print $1}')
 else
-	# Invert the NOAUTO list.
+	# Get a list of datasets for which snapshots are not explicitly disabled.
 	CANDIDATES=$(echo "$ZFS_LIST" | awk -F '\t' \
 	  'tolower($2) !~ /false/ && tolower($3) !~ /false/ {print $1}')
 fi
