@@ -56,6 +56,7 @@ SNAPSHOTS_OLD=''
 print_usage ()
 {
 	echo "Usage: $0 [options] [-l label] <'//' | name [name...]>
+
   --default-exclude  Exclude datasets if com.sun:auto-snapshot is unset.
   -d, --debug        Print debugging messages.
   -e, --event=EVENT  Set the com.sun:auto-snapshot-desc property to EVENT.
@@ -74,8 +75,12 @@ print_usage ()
   -r, --recursive    Snapshot named filesystem and all descendants.
   -v, --verbose      Print info messages.
       --destroy-only Only destroy older snapshots, do not create new ones.
+      --min-size=MIN Snapshot only if >= MIN KiB written since prior snapshot.
       name           Filesystem and volume names, or '//' for all ZFS datasets.
-" 
+
+Refer to the zfs-auto-snapshot(8) man page for additional information.
+(Parameters not covered here include: --pre-snapshot, --post-snapshot)
+"
 }
 
 
