@@ -158,13 +158,12 @@ do_run () # [argv]
 }
 
 
-do_snapshots () # properties, flags, snapname, oldglob, [targets...]
+do_snapshots () # properties, flags, snapname, [targets...]
 {
 	local PROPS="$1"
 	local FLAGS="$2"
 	local NAME="$3"
-	local GLOB="$4"
-	local TARGETS=("${@:5}")
+	local TARGETS=("${@:4}")
 	local KEEP=''
 	local RUNSNAP=1
 
@@ -172,6 +171,15 @@ do_snapshots () # properties, flags, snapname, oldglob, [targets...]
 	# global SNAPSHOT_COUNT
 	# global WARNING_COUNT
 	# global SNAPSHOTS_OLD
+
+	# RE_OLD is the regular expression that old snapshots must match against.
+	# Here, we precompute RE_OLD_BASE, which contains the non-dataset-specific parts that won't change.
+	# We must escape any characters in the valid char set so they will still match literally.
+	# In practice, the only such character we need to worry about is '.'.
+	local RE_OLD_PREFIX=${opt_prefix:+$opt_prefix$opt_sep}
+	local RE_OLD_DATE='\d{4}-\d{2}-\d{2}-\d{4}'
+	local RE_OLD_LABEL=${opt_label:+$opt_sep$opt_label}
+	local RE_OLD_BASE=${RE_OLD_PREFIX//./\\.}${RE_OLD_DATE}${RE_OLD_LABEL//./\\.}
 
 	for ii in "${TARGETS[@]}"
 	do
@@ -197,7 +205,7 @@ do_snapshots () # properties, flags, snapname, oldglob, [targets...]
 			then
 				do_run "$opt_pre_snapshot $ii $NAME" || RUNSNAP=0
 			fi
-			if [ $RUNSNAP -eq 1 ] && do_run "zfs snapshot $PROPS $FLAGS '$ii@$NAME'"
+			if [ $RUNSNAP -eq 1 ] && do_run "zfs snapshot ${PROPS:+$PROPS }${FLAGS:+$FLAGS }'$ii@$NAME'"
 			then
 				[ "$opt_post_snapshot" != "" ] && do_run "$opt_post_snapshot $ii $NAME"
 				SNAPSHOT_COUNT=$(( $SNAPSHOT_COUNT + 1 ))
@@ -212,16 +220,18 @@ do_snapshots () # properties, flags, snapname, oldglob, [targets...]
 		test -z "$opt_keep" && continue
 		KEEP="$opt_keep"
 
+		local RE_OLD='^'${ii//./\\.}'@'${RE_OLD_BASE}'$'
+
 		# ASSERT: The old snapshot list is sorted by increasing age.
 		for jj in "${SNAPSHOTS_OLD[@]}"
 		do
 			# Check whether this is an old snapshot of the filesystem.
-			if [ -z "${jj#$ii@$GLOB}" ]
+			if [[ "$jj" =~ $RE_OLD ]]
 			then
 				KEEP=$(( $KEEP - 1 ))
 				if [ "$KEEP" -le '0' ]
 				then
-					if do_run "zfs destroy -d $FLAGS '$jj'"
+					if do_run "zfs destroy -d ${FLAGS:+$FLAGS }'$jj'"
 					then
 						DESTRUCTION_COUNT=$(( $DESTRUCTION_COUNT + 1 ))
 					else
@@ -593,9 +603,6 @@ DATE=$(date -u +%F-%H%M)
 # The snapshot name after the @ symbol.
 SNAPNAME="${opt_prefix:+$opt_prefix$opt_sep}$DATE${opt_label:+$opt_sep$opt_label}"
 
-# The expression for matching old snapshots.  YYYY-MM-DD-HHMM
-SNAPGLOB="${opt_prefix:+$opt_prefix$opt_sep}????-??-??-????${opt_label:+$opt_sep$opt_label}"
-
 if [ -n "$opt_do_snapshots" ]
 then
 	test -n "$TARGETS_REGULAR" \
@@ -622,8 +629,8 @@ fi
 test -n "$opt_dry_run" \
   && print_log info "Doing a dry run. Not running these commands..."
 
-do_snapshots "$SNAPPROP" ""   "$SNAPNAME" "$SNAPGLOB" "${TARGETS_REGULAR[@]}"
-do_snapshots "$SNAPPROP" "-r" "$SNAPNAME" "$SNAPGLOB" "${TARGETS_RECURSIVE[@]}"
+do_snapshots "$SNAPPROP" ""   "$SNAPNAME" "${TARGETS_REGULAR[@]}"
+do_snapshots "$SNAPPROP" "-r" "$SNAPNAME" "${TARGETS_RECURSIVE[@]}"
 
 print_log notice "@$SNAPNAME," \
   "$SNAPSHOT_COUNT created," \
