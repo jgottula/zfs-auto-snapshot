@@ -56,6 +56,10 @@ WARNING_COUNT='0'
 # Other global variables.
 SNAPSHOTS_OLD=''
 
+# Regex: valid characters for snapshot names (technically ' ' is okay, but we will disallow it)
+# See: lib/libzfs/libzfs_dataset.c, module/zcommon/zfs_namecheck.c
+RE_VALID='^[[:alnum:]-_.:]*$'
+
 
 print_usage ()
 {
@@ -300,17 +304,11 @@ do
 			shift 2
 			;;
 		(-l|--label)
-			opt_label="$2"
-			while test "${#opt_label}" -gt '0'
-			do
-				case $opt_label in
-					([![:alnum:]_.:-]*)
-						print_log error "The $1 parameter must be alphanumeric."
-						exit 202
-						;;
-				esac
-				opt_label="${opt_label#?}"
-			done
+			if [[ ! "$2" =~ $RE_VALID ]]
+			then
+				print_log error "The $1 parameter must be alphanumeric."
+				exit 202
+			fi
 			opt_label="$2"
 			shift 2
 			;;
@@ -324,17 +322,11 @@ do
 			shift 2
 			;;
 		(-p|--prefix)
-			opt_prefix="$2"
-			while test "${#opt_prefix}" -gt '0'
-			do
-				case $opt_prefix in
-					([![:alnum:]_.:-]*)
-						print_log error "The $1 parameter must be alphanumeric."
-						exit 130
-						;;
-				esac
-				opt_prefix="${opt_prefix#?}"
-			done
+			if [[ ! "$2" =~ $RE_VALID ]]
+			then
+				print_log error "The $1 parameter must be alphanumeric."
+				exit 130
+			fi
 			opt_prefix="$2"
 			shift 2
 			;;
@@ -349,19 +341,15 @@ do
 			shift 1
 			;;
 		(--sep)
-			case "$2" in
-				([[:alnum:]_.:-])
-					:
-					;;
-				('')
-					print_log error "The $1 parameter must be non-empty."
-					exit 131
-					;;
-				(*)
-					print_log error "The $1 parameter must be one alphanumeric character."
-					exit 132
-					;;
-			esac
+			if [[ "$2" == "" ]]
+			then
+				print_log error "The $1 parameter must be non-empty."
+				exit 131
+			elif [[ ! "$2" =~ $RE_VALID ]]
+			then
+				print_log error "The $1 parameter must be one alphanumeric character."
+				exit 132
+			fi
 			opt_sep="$2"
 			shift 2
 			;;
