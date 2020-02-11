@@ -419,7 +419,7 @@ ZPOOL_STATUS=$(env LC_ALL=C zpool status 2>&1 ) \
 
 
 ZFS_LIST=$(env LC_ALL=C zfs list -H -t filesystem,volume -s name \
-  -o name,com.sun:auto-snapshot${opt_label:+,com.sun:auto-snapshot:"$opt_label"}) \
+  -o name,receive_resume_token,com.sun:auto-snapshot${opt_label:+,com.sun:auto-snapshot:"$opt_label"}) \
   || { print_log error "zfs list $?: $ZFS_LIST"; exit 136; }
 
 if [ -n "$opt_fast_zfs_list" ]
@@ -463,11 +463,17 @@ ZPOOLS_NOTREADY=($(echo "$ZPOOL_STATUS" | awk -F ': ' \
 if [ -n "$opt_label" ]
 then
 	NOAUTO=($(echo "$ZFS_LIST" | awk -F '\t' \
-	  'tolower($2) ~ /false/ || tolower($3) ~ /false/ {print $1}'))
+	  'tolower($3) ~ /false/ || tolower($4) ~ /false/ {print $1}'))
 else
 	NOAUTO=($(echo "$ZFS_LIST" | awk -F '\t' \
-	  'tolower($2) ~ /false/ {print $1}'))
+	  'tolower($3) ~ /false/ {print $1}'))
 fi
+
+# Exclude datasets that are identified as actively receiving right now
+# (i.e. they have property receive_resume_token set to something).
+# Note that this will only detect cases where 'zfs recv -s' is being used.
+NOAUTO+=($(echo "$ZFS_LIST" | awk -F '\t' \
+	'$2 !~ /^-$/ {print $1}'))
 
 # If the --default-include flag is set, then include all datasets that lack
 # an explicit com.sun:auto-snapshot* property. Otherwise, exclude them.
@@ -477,20 +483,20 @@ then
 	if [ -n "$opt_label" ]
 	then
 		CANDIDATES=($(echo "$ZFS_LIST" | awk -F '\t' \
-		  'tolower($2) ~ /true/ && tolower($3) ~ /true/ {print $1}'))
+		  'tolower($3) ~ /true/ && tolower($4) ~ /true/ {print $1}'))
 	else
 		CANDIDATES=($(echo "$ZFS_LIST" | awk -F '\t' \
-		  'tolower($2) ~ /true/ {print $1}'))
+		  'tolower($3) ~ /true/ {print $1}'))
 	fi
 else
 	# Get a list of datasets for which snapshots are not explicitly disabled.
 	if [ -n "$opt_label" ]
 	then
 		CANDIDATES=($(echo "$ZFS_LIST" | awk -F '\t' \
-		  'tolower($2) !~ /false/ && tolower($3) !~ /false/ {print $1}'))
+		  'tolower($3) !~ /false/ && tolower($4) !~ /false/ {print $1}'))
 	else
 		CANDIDATES=($(echo "$ZFS_LIST" | awk -F '\t' \
-		  'tolower($2) !~ /false/ {print $1}'))
+		  'tolower($3) !~ /false/ {print $1}'))
 	fi
 fi
 
