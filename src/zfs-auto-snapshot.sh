@@ -42,6 +42,7 @@ opt_sep='_'
 opt_setauto=''
 opt_syslog=''
 opt_skip_scrub=''
+opt_skip_recv=''
 opt_verbose=''
 opt_pre_snapshot=''
 opt_post_snapshot=''
@@ -71,6 +72,7 @@ print_usage ()
       --fast         Use a faster zfs list invocation.
   -n, --dry-run      Print actions without actually doing anything.
   -s, --skip-scrub   Do not snapshot filesystems in scrubbing pools.
+      --skip-recv    Skip datasets that are being received with resume token.
   -h, --help         Print this usage message.
   -k, --keep=NUM     Keep NUM recent snapshots and destroy older snapshots.
   -l, --label=LAB    LAB is usually 'hourly', 'daily', or 'monthly'.
@@ -254,7 +256,7 @@ else
 fi
 
 GETOPT=$($GETOPT_BIN \
-  --longoptions=default-include,dry-run,fast,skip-scrub,recursive \
+  --longoptions=default-include,dry-run,fast,skip-scrub,skip-recv,recursive \
   --longoptions=event:,keep:,label:,prefix:,sep: \
   --longoptions=debug,help,quiet,syslog,verbose \
   --longoptions=pre-snapshot:,post-snapshot:,destroy-only \
@@ -298,6 +300,10 @@ do
 			;;
 		(-s|--skip-scrub)
 			opt_skip_scrub='1'
+			shift 1
+			;;
+		(--skip-recv)
+			opt_skip_recv='1'
 			shift 1
 			;;
 		(-h|--help)
@@ -469,11 +475,12 @@ else
 	  'tolower($3) ~ /false/ {print $1}'))
 fi
 
-# Exclude datasets that are identified as actively receiving right now
+# Get a list of datasets that are identified as actively receiving right now
 # (i.e. they have property receive_resume_token set to something).
 # Note that this will only detect cases where 'zfs recv -s' is being used.
-NOAUTO+=($(echo "$ZFS_LIST" | awk -F '\t' \
+RECEIVING=($(echo "$ZFS_LIST" | awk -F '\t' \
 	'$2 !~ /^-$/ {print $1}'))
+NOAUTO+=(${RECEIVING[@]})
 
 # If the --default-include flag is set, then include all datasets that lack
 # an explicit com.sun:auto-snapshot* property. Otherwise, exclude them.
@@ -564,6 +571,18 @@ do
 		fi
 	done
 
+	# Exclude datasets that are undergoing a receive operation
+	# (i.e. property receive_resume_token is set)
+	# if the --skip-recv flag is set.
+	test -n "$opt_skip_recv" && for jj in "${RECEIVING[@]}"
+	do
+		if [ "$iii" = "$jj/" ]
+		then
+			print_log info "Excluding $ii because it is currently being received."
+			continue 2
+		fi
+	done
+
 	for jj in "${NOAUTO[@]}"
 	do
 		# Ibid regarding iii.
@@ -603,6 +622,7 @@ do
 	#
 	#   * Does not have an exclusionary property.
 	#   * Is in a pool that can currently do snapshots.
+	#   * Is not currently undergoing a receive operation.
 	#   * Does not have an excluded descendent filesystem.
 	#   * Is not the descendant of an already included filesystem.
 	#

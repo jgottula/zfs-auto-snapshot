@@ -34,6 +34,12 @@ Print actions without actually doing anything.
 \fB\-s\fR, \fB\-\-skip\-scrub\fR
 Do not snapshot filesystems in scrubbing pools.
 .TP
+\fB\-\-skip\-scrub\fR
+Skip datasets that are being received. Only works when using the \fB-s\fR
+option with \fBzfs recv\fR (due to detecting based on the presence of the
+\fBreceive_resume_token\fR property on the dataset).
+(Non-standard behavior.)
+.TP
 \fB\-h\fR, \fB\-\-help\fR
 Print the usage message.
 .TP
