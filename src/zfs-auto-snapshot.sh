@@ -416,6 +416,12 @@ then
 	exit 134
 fi
 
+# ISO style date; fifteen characters: YYYY-MM-DD-HHMM
+# On Solaris %H%M expands to 12h34.
+# We use the shortform -u here because --utc is not supported on macos.
+# NOTE: we now grab this BEFORE running any time-consuming zpool/zfs commands!
+DATE=$(date -u +%F-%H%M)
+
 # These are the only times that `zpool status` or `zfs list` are invoked, so
 # this program for Linux has a much better runtime complexity than the similar
 # Solaris implementation.
@@ -638,11 +644,6 @@ then
 else
 	SNAPPROP=""
 fi
-
-# ISO style date; fifteen characters: YYYY-MM-DD-HHMM
-# On Solaris %H%M expands to 12h34.
-# We use the shortfirm -u here because --utc is not supported on macos.
-DATE=$(date -u +%F-%H%M)
 
 # The snapshot name after the @ symbol.
 SNAPNAME="${opt_prefix:+$opt_prefix$opt_sep}$DATE${opt_label:+$opt_sep$opt_label}"
