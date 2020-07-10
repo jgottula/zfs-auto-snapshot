@@ -19,6 +19,13 @@
 # Place, Suite 330, Boston, MA  02111-1307  USA
 #
 
+# Only allow one instance of zfs-auto-snapshot to run at any given time
+# (to avoid possible race conditions due to multiple different 'label' runs happening at once)
+# NOTE: this is an adaptation of the example code straight out of 'man 1 flock'
+if [[ "$FLOCKER" != "$0" ]]; then
+	exec env FLOCKER="$0" flock --exclusive "$0" "$0" "$@"
+fi
+
 # ZSH: enable PCRE regex
 set -o rematchpcre
 
