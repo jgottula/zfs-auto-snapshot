@@ -19,11 +19,19 @@
 # Place, Suite 330, Boston, MA  02111-1307  USA
 #
 
+# ISO style date; fifteen characters: YYYY-MM-DD-HHMM
+# On Solaris %H%M expands to 12h34.
+# We use the shortform -u here because --utc is not supported on macos.
+# NOTE: we now grab this BEFORE running any time-consuming zpool/zfs commands!
+#       (and actually also BEFORE we do the flock stuff as well... slightly sketchy but nicer looking at least...)
+# NOTE: we set DATE_PRELOCK here (twice actually); but when we're flock'd, DATE will be pre-set in the environment
+DATE_PRELOCK=$(date -u +%F-%H%M)
+
 # Only allow one instance of zfs-auto-snapshot to run at any given time
 # (to avoid possible race conditions due to multiple different 'label' runs happening at once)
 # NOTE: this is an adaptation of the example code straight out of 'man 1 flock'
 if [[ "$FLOCKER" != "$0" ]]; then
-	exec env FLOCKER="$0" flock --exclusive "$0" "$0" "$@"
+	exec env FLOCKER="$0" DATE="$DATE_PRELOCK" flock --exclusive "$0" "$0" "$@"
 fi
 
 # ZSH: enable PCRE regex
@@ -422,12 +430,6 @@ then
 	print_log error "The // must be the only argument if it is given."
 	exit 134
 fi
-
-# ISO style date; fifteen characters: YYYY-MM-DD-HHMM
-# On Solaris %H%M expands to 12h34.
-# We use the shortform -u here because --utc is not supported on macos.
-# NOTE: we now grab this BEFORE running any time-consuming zpool/zfs commands!
-DATE=$(date -u +%F-%H%M)
 
 # These are the only times that `zpool status` or `zfs list` are invoked, so
 # this program for Linux has a much better runtime complexity than the similar
