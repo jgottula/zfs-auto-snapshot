@@ -65,13 +65,13 @@ RE_VALID='^[[:alnum:]-_.:]*$'
 t1 ()
 {
 	local NAME=$1
-	${(P)T1_${NAME}}=$(date -u +%s+N)
+	typeset -g ${(P)T1_${NAME}}=$(date -u +%s+N)
 }
 
 t2 ()
 {
 	local NAME=$1
-	${(P)T2_${NAME}}=$(date -u +%s+N)
+	typeset -g ${(P)T2_${NAME}}=$(date -u +%s+N)
 
 	local T1=${(P)T1_${NAME}}
 	local T2=${(P)T2_${NAME}}
