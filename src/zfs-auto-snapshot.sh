@@ -200,23 +200,23 @@ do_snapshots () # properties, flags, snapname, [targets...]
 
 	for ii in "${TARGETS[@]}"
 	do
-                # Check if size check is > 0
-                size_check_skip=0
-                if [ "$opt_min_size" -gt 0 ]
-                then
-                        bytes_written=`zfs get -Hp -o value written $ii`
-                        kb_written=$(( $bytes_written / 1024 ))
-                        if [ "$kb_written" -lt "$opt_min_size" ]
-                        then
-                                size_check_skip=1
-                                if [ $opt_verbose -gt 0 ]
-                                then
-                                        echo "Skipping target $ii, only $kb_written kB written since last snap. opt_min_size is $opt_min_size"
-                                fi
-                        fi
-                fi
+		# Check if size check is > 0
+		size_check_skip=0
+		if [ "$opt_min_size" -gt 0 ]
+		then
+			bytes_written=`zfs get -Hp -o value written $ii`
+			kb_written=$(( $bytes_written / 1024 ))
+			if [ "$kb_written" -lt "$opt_min_size" ]
+			then
+				size_check_skip=1
+				if [ $opt_verbose -gt 0 ]
+				then
+					echo "Skipping target $ii, only $kb_written kB written since last snap. opt_min_size is $opt_min_size"
+				fi
+			fi
+		fi
 
-                if [ -n "$opt_do_snapshots" -a "$size_check_skip" -eq 0 ]
+		if [ -n "$opt_do_snapshots" -a "$size_check_skip" -eq 0 ]
 		then
 			if [ "$opt_pre_snapshot" != "" ]
 			then
