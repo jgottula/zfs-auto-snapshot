@@ -476,12 +476,17 @@ fi
 # NOTE: we set DATE_PRELOCK here (twice actually); but when we're flock'd, DATE will be pre-set in the environment
 DATE_PRELOCK=$(date -u +%F-%H%M)
 
-# Only allow one instance of zfs-auto-snapshot to run (besides option parsing) at any given time
+# We use a per-label flock: this means that instances can run in parallel, so long as they are for different labels
+# If a label is specified: /var/lock/zfs-auto-snapshot-LABEL
+# Otherwise:               /var/lock/zfs-auto-snapshot
+FLOCK_PATH="/var/lock/zfs-auto-snapshot${opt_label:+-$opt_label}"
+
+# Only allow one instance of zfs-auto-snapshot, per-label, to run (besides option parsing) at any given time
 # (to avoid possible race conditions due to multiple different runs with the same 'label' happening at once)
 # NOTE: this is an adaptation of the example code straight out of 'man 1 flock'
-if [[ "$FLOCKER" != "$0" ]]; then
+if [[ "$FLOCKER" != "$FLOCK_PATH" ]]; then
 	t1 FLOCK
-	exec env FLOCKER="$0" DATE="$DATE_PRELOCK" T1_FLOCK="$T1_FLOCK" flock --exclusive "$0" "$0" "${ARGS_PRELOCK[@]}"
+	exec env FLOCKER="$FLOCK_PATH" DATE="$DATE_PRELOCK" T1_FLOCK="$T1_FLOCK" flock --exclusive "$FLOCK_PATH" "$0" "${ARGS_PRELOCK[@]}"
 else
 	t2 FLOCK
 	print_log notice "time spent waiting on flock: $(dt FLOCK 2)"
