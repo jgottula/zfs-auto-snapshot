@@ -62,6 +62,52 @@ SNAPSHOTS_OLD=''
 RE_VALID='^[[:alnum:]-_.:]*$'
 
 
+t1 ()
+{
+	local NAME=$1
+	${(P)T1_${NAME}}=$(date -u +%s+N)
+}
+
+t2 ()
+{
+	local NAME=$1
+	${(P)T2_${NAME}}=$(date -u +%s+N)
+
+	local T1=${(P)T1_${NAME}}
+	local T2=${(P)T2_${NAME}}
+
+	local DT=$(( T2 - T1 ))
+	(( DT >= 0 )) || (( DT = 0 ))
+
+	# accumulate globally, to allow doing [ t1...t2 t1...t2 t1...t2 dt ] with cumulative results
+	(( ${(P)DT_${NAME}} += DT ))
+}
+
+dt ()
+{
+	local NAME=$1 PREC=$2
+
+	local DT=${(P)DT_${NAME}}
+	(( DT >= 0 )) || (( DT = 0 ))
+
+	local DIV_NSEC=$(( 10 **   9          ))
+	local DIV_PREC=$(( 10 **       PREC   ))
+	local DIV_PINV=$(( 10 ** ( 9 - PREC ) ))
+
+	local DT_SEC_WHOL=$((   DT / DIV_NSEC              ))
+	local DT_SEC_FRAC=$(( ( DT / DIV_PINV ) % DIV_PREC ))
+
+	local DT_MIN=$(( DT_SEC_WHOL / 60 ))
+	local DT_SEC=$(( DT_SEC_WHOL % 60 ))
+
+	if (( $PREC > 0 )); then
+		printf '%u:%02u.%0*u\n' "$DT_MIN" "$DT_SEC" "$PREC" "$DT_SEC_FRAC"
+	else
+		printf '%u:%02u\n' "$DT_MIN" "$DT_SEC"
+	fi
+}
+
+
 print_usage ()
 {
 	echo "Usage: zfs-auto-snapshot [options] [-l label] <'//' | name [name...]>
@@ -434,7 +480,11 @@ DATE_PRELOCK=$(date -u +%F-%H%M)
 # (to avoid possible race conditions due to multiple different runs with the same 'label' happening at once)
 # NOTE: this is an adaptation of the example code straight out of 'man 1 flock'
 if [[ "$FLOCKER" != "$0" ]]; then
-	exec env FLOCKER="$0" DATE="$DATE_PRELOCK" flock --exclusive "$0" "$0" "${ARGS_PRELOCK[@]}"
+	t1 FLOCK
+	exec env FLOCKER="$0" DATE="$DATE_PRELOCK" T1_FLOCK="$T1_FLOCK" flock --exclusive "$0" "$0" "${ARGS_PRELOCK[@]}"
+else
+	t2 FLOCK
+	print_log notice "time spent waiting on flock: $(dt FLOCK 2)"
 fi
 
 
@@ -451,14 +501,21 @@ fi
 # this program for Linux has a much better runtime complexity than the similar
 # Solaris implementation.
 
+t1 ZPOOL_STATUS
 ZPOOL_STATUS=$(env LC_ALL=C zpool status 2>&1 ) \
   || { print_log error "zpool status $?: $ZPOOL_STATUS"; exit 135; }
+t2 ZPOOL_STATUS
+print_log notice "time spent on 'zpool status': $(dt ZPOOL_STATUS 2)"
 
 
+t1 ZFS_LIST1
 ZFS_LIST=$(env LC_ALL=C zfs list -H -t filesystem,volume -s name \
   -o name,receive_resume_token,com.sun:auto-snapshot${opt_label:+,com.sun:auto-snapshot:"$opt_label"}) \
   || { print_log error "zfs list $?: $ZFS_LIST"; exit 136; }
+t2 ZFS_LIST1
+print_log notice "time spent on 'zfs list' (datasets): $(dt ZFS_LIST1 2)"
 
+t1 ZFS_LIST2
 if [ -n "$opt_fast_zfs_list" ]
 then
 	SNAPSHOTS_OLD=($(env LC_ALL=C zfs list -H -t snapshot -o name -s name | \
@@ -469,6 +526,8 @@ else
 	SNAPSHOTS_OLD=($(env LC_ALL=C zfs list -H -t snapshot -S creation -o name)) \
 	  || { print_log error "zfs list $?: $SNAPSHOTS_OLD"; exit 137; }
 fi
+t2 ZFS_LIST2
+print_log notice "time spent on 'zfs list' (snapshots): $(dt ZFS_LIST2 2)"
 
 # Verify that each argument is a filesystem or volume.
 for ii in "$@"
