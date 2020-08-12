@@ -19,21 +19,6 @@
 # Place, Suite 330, Boston, MA  02111-1307  USA
 #
 
-# ISO style date; fifteen characters: YYYY-MM-DD-HHMM
-# On Solaris %H%M expands to 12h34.
-# We use the shortform -u here because --utc is not supported on macos.
-# NOTE: we now grab this BEFORE running any time-consuming zpool/zfs commands!
-#       (and actually also BEFORE we do the flock stuff as well... slightly sketchy but nicer looking at least...)
-# NOTE: we set DATE_PRELOCK here (twice actually); but when we're flock'd, DATE will be pre-set in the environment
-DATE_PRELOCK=$(date -u +%F-%H%M)
-
-# Only allow one instance of zfs-auto-snapshot to run at any given time
-# (to avoid possible race conditions due to multiple different 'label' runs happening at once)
-# NOTE: this is an adaptation of the example code straight out of 'man 1 flock'
-if [[ "$FLOCKER" != "$0" ]]; then
-	exec env FLOCKER="$0" DATE="$DATE_PRELOCK" flock --exclusive "$0" "$0" "$@"
-fi
-
 # ZSH: enable PCRE regex
 set -o rematchpcre
 
@@ -264,6 +249,11 @@ do_snapshots () # properties, flags, snapname, [targets...]
 # main ()
 # {
 
+# Save the original command line parameters, because we will parse them twice:
+# once before taking the flock, and then again once holding the flock
+# (this is messy, but it's necessary for stuff like --help to work immediately without blocking on the flock)
+ARGS_PRELOCK=("$@")
+
 if [ "$(uname)" = "Darwin" ]; then
   GETOPT_BIN="$(brew --prefix gnu-getopt 2> /dev/null || echo /usr/local)/bin/getopt"
 else
@@ -430,6 +420,32 @@ then
 	print_log error "The // must be the only argument if it is given."
 	exit 134
 fi
+
+
+# ISO style date; fifteen characters: YYYY-MM-DD-HHMM
+# On Solaris %H%M expands to 12h34.
+# We use the shortform -u here because --utc is not supported on macos.
+# NOTE: we now grab this BEFORE running any time-consuming zpool/zfs commands!
+#       (and actually also BEFORE we do the flock stuff as well... slightly sketchy but nicer looking at least...)
+# NOTE: we set DATE_PRELOCK here (twice actually); but when we're flock'd, DATE will be pre-set in the environment
+DATE_PRELOCK=$(date -u +%F-%H%M)
+
+# Only allow one instance of zfs-auto-snapshot to run (besides option parsing) at any given time
+# (to avoid possible race conditions due to multiple different runs with the same 'label' happening at once)
+# NOTE: this is an adaptation of the example code straight out of 'man 1 flock'
+if [[ "$FLOCKER" != "$0" ]]; then
+	exec env FLOCKER="$0" DATE="$DATE_PRELOCK" flock --exclusive "$0" "$0" "${ARGS_PRELOCK[@]}"
+fi
+
+
+##########################################################################################################
+##########################################################################################################
+##                                                                                                      ##
+##  file-level code above this point is executed WITHOUT flock; below is executed with the flock HELD!  ##
+##                                                                                                      ##
+##########################################################################################################
+##########################################################################################################
+
 
 # These are the only times that `zpool status` or `zfs list` are invoked, so
 # this program for Linux has a much better runtime complexity than the similar
