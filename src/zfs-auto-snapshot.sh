@@ -767,8 +767,15 @@ fi
 test -n "$opt_dry_run" \
   && print_log info "Doing a dry run. Not running these commands..."
 
+t1 DO_SNAPS
 do_snapshots "$SNAPPROP" ""   "$SNAPNAME" "${TARGETS_REGULAR[@]}"
+t2 DO_SNAPS
+print_log notice "time spent doing snapshots (regular): $(dt DO_SNAPS 2)"
+
+t1 DO_SNAPS_R
 do_snapshots "$SNAPPROP" "-r" "$SNAPNAME" "${TARGETS_RECURSIVE[@]}"
+t2 DO_SNAPS_R
+print_log notice "time spent doing snapshots (recursive): $(dt DO_SNAPS_R 2)"
 
 print_log notice "@$SNAPNAME," \
   "$SNAPSHOT_COUNT created," \
