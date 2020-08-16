@@ -143,7 +143,7 @@ Refer to the zfs-auto-snapshot(8) man page for additional information.
 
 print_log () # level, message, ...
 {
-	LEVEL=$1
+	local LEVEL=$1
 	shift 1
 
 	case $LEVEL in
@@ -192,10 +192,10 @@ do_run () # [argv]
 	if [ -n "$opt_dry_run" ]
 	then
 		echo $*
-		RC="$?"
+		local RC="$?"
 	else
 		eval $*
-		RC="$?"
+		local RC="$?"
 		if [ "$RC" -eq '0' ]
 		then
 			print_log debug "$*"
@@ -230,14 +230,15 @@ do_snapshots () # properties, flags, snapname, [targets...]
 	local RE_OLD_LABEL=${opt_label:+$opt_sep$opt_label}
 	local RE_OLD_BASE=${RE_OLD_PREFIX//./\\.}${RE_OLD_DATE}${RE_OLD_LABEL//./\\.}
 
+	local ii
 	for ii in "${TARGETS[@]}"
 	do
 		# Check if size check is > 0
-		size_check_skip=0
+		local size_check_skip=0
 		if [ "$opt_min_size" -gt 0 ]
 		then
-			bytes_written=`zfs get -Hp -o value written $ii`
-			kb_written=$(( $bytes_written / 1024 ))
+			local bytes_written=`zfs get -Hp -o value written $ii`
+			local kb_written=$(( $bytes_written / 1024 ))
 			if [ "$kb_written" -lt "$opt_min_size" ]
 			then
 				size_check_skip=1
