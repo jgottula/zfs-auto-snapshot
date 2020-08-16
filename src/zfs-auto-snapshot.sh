@@ -146,42 +146,49 @@ print_log () # level, message, ...
 	local LEVEL=$1
 	shift 1
 
+	local TAG="zfs-auto-snapshot"
+	[[ -n "$opt_label" ]] && TAG+="<$opt_label>"
+
 	case $LEVEL in
 		(eme*)
-			test -n "$opt_syslog" && logger -t "zfs-auto-snapshot" -p daemon.emerge $*
-			echo Emergency: $* 1>&2
+			[[ -n "$opt_syslog" ]] && logger --id=$$ -t $TAG -p daemon.emerge $* ||
+				echo Emergency: $* 1>&2
 			;;
 		(ale*)
-			test -n "$opt_syslog" && logger -t "zfs-auto-snapshot" -p daemon.alert $*
-			echo Alert: $* 1>&2
+			[[ -n "$opt_syslog" ]] && logger --id=$$ -t $TAG -p daemon.alert $* ||
+				echo Alert: $* 1>&2
 			;;
 		(cri*)
-			test -n "$opt_syslog" && logger -t "zfs-auto-snapshot" -p daemon.crit $*
-			echo Critical: $* 1>&2
+			[[ -n "$opt_syslog" ]] && logger --id=$$ -t $TAG -p daemon.crit $* ||
+				echo Critical: $* 1>&2
 			;;
 		(err*)
-			test -n "$opt_syslog" && logger -t "zfs-auto-snapshot" -p daemon.err $*
-			echo Error: $* 1>&2
+			[[ -n "$opt_syslog" ]] && logger --id=$$ -t $TAG -p daemon.err $* ||
+				echo Error: $* 1>&2
 			;;
 		(war*)
-			test -n "$opt_syslog" && logger -t "zfs-auto-snapshot" -p daemon.warning $*
-			test -z "$opt_quiet" && echo Warning: $* 1>&2
+			[[ -n "$opt_syslog" ]] && logger --id=$$ -t $TAG -p daemon.warning $* ||
+				{ [[ -z "$opt_quiet" ]] && echo Warning: $* 1>&2 ; }
 			;;
 		(not*)
-			test -n "$opt_syslog" && logger -t "zfs-auto-snapshot" -p daemon.notice $*
-			test -z "$opt_quiet" && echo $*
+			[[ -n "$opt_syslog" ]] && logger --id=$$ -t $TAG -p daemon.notice $* ||
+				{ [[ -z "$opt_quiet" ]] && echo $* 1>&2 ; }
 			;;
 		(inf*)
-			# test -n "$opt_syslog" && logger -t "zfs-auto-snapshot" -p daemon.info $*
-			test -z "$opt_quiet" && test -n "$opt_verbose" && echo $*
+			if [[ -n "$opt_verbose" ]]; then
+				[[ -n "$opt_syslog" ]] && logger --id=$$ -t $TAG -p daemon.info $* ||
+					{ [[ -z "$opt_quiet" ]] && echo $* 1>&2 ; }
+			fi
 			;;
 		(deb*)
-			# test -n "$opt_syslog" && logger -t "zfs-auto-snapshot" -p daemon.debug $*
-			test -n "$opt_debug" && echo Debug: $*
+			if [[ -n "$opt_debug" ]]; then
+				[[ -n "$opt_syslog" ]] && logger --id=$$ -t $TAG -p daemon.debug $* ||
+					{ [[ -z "$opt_quiet" ]] && echo Debug: $* 1>&2 ; }
+			fi
 			;;
 		(*)
-			test -n "$opt_syslog" && logger -t "zfs-auto-snapshot" $*
-			echo $* 1>&2
+			[[ -n "$opt_syslog" ]] && logger --id=$$ -t $TAG $* ||
+				{ [[ -z "$opt_quiet" ]] && echo $* 1>&2 ; }
 			;;
 	esac
 }
