@@ -62,40 +62,41 @@ SNAPSHOTS_OLD=''
 RE_VALID='^[[:alnum:]-_.:]*$'
 
 
+typeset -A T1 T2 DT
+
 t1 ()
 {
-	local NAME=$1
-	typeset -g ${(P)T1_${NAME}}=$(date -u +%s+N)
+	T1[$1]=$(date -u '+%s%N')
 }
 
 t2 ()
 {
-	local NAME=$1
-	typeset -g ${(P)T2_${NAME}}=$(date -u +%s+N)
+	[[ -v T1[$1] ]] || return # problem!
 
-	local T1=${(P)T1_${NAME}}
-	local T2=${(P)T2_${NAME}}
+	T2[$1]=$(date -u '+%s%N')
 
-	local DT=$(( T2 - T1 ))
-	(( DT >= 0 )) || (( DT = 0 ))
+	local DTI=$(( T2[$1] - T1[$1] ))   # ; echo >&2 "t2: DTI=$DTI"
+	(( DTI >= 0 )) || (( DTI = 0 ))    # ; echo >&2 "t2: DTI=$DTI"
 
 	# accumulate globally, to allow doing [ t1...t2 t1...t2 t1...t2 dt ] with cumulative results
-	(( ${(P)DT_${NAME}} += DT ))
+	(( DT[$1] += DTI ))
+
+	unset "T1[$1]"
+	unset "T2[$1]"
 }
 
 dt ()
 {
-	local NAME=$1 PREC=$2
+	local PREC=$2
 
-	local DT=${(P)DT_${NAME}}
-	(( DT >= 0 )) || (( DT = 0 ))
+	[[ -v DT[$1] ]] || return # problem!
 
 	local DIV_NSEC=$(( 10 **   9          ))
 	local DIV_PREC=$(( 10 **       PREC   ))
 	local DIV_PINV=$(( 10 ** ( 9 - PREC ) ))
 
-	local DT_SEC_WHOL=$((   DT / DIV_NSEC              ))
-	local DT_SEC_FRAC=$(( ( DT / DIV_PINV ) % DIV_PREC ))
+	local DT_SEC_WHOL=$((   DT[$1] / DIV_NSEC              ))
+	local DT_SEC_FRAC=$(( ( DT[$1] / DIV_PINV ) % DIV_PREC ))
 
 	local DT_MIN=$(( DT_SEC_WHOL / 60 ))
 	local DT_SEC=$(( DT_SEC_WHOL % 60 ))
@@ -486,8 +487,11 @@ FLOCK_PATH="/var/lock/zfs-auto-snapshot${opt_label:+-$opt_label}"
 # NOTE: this is an adaptation of the example code straight out of 'man 1 flock'
 if [[ "$FLOCKER" != "$FLOCK_PATH" ]]; then
 	t1 FLOCK
-	exec env FLOCKER="$FLOCK_PATH" DATE="$DATE_PRELOCK" T1_FLOCK="$T1_FLOCK" flock --exclusive "$FLOCK_PATH" "$0" "${ARGS_PRELOCK[@]}"
+	exec env FLOCKER="$FLOCK_PATH" DATE="$DATE_PRELOCK" T1_FLOCK="$T1[FLOCK]" flock --exclusive "$FLOCK_PATH" "$0" "${ARGS_PRELOCK[@]}"
+	# TODO: is there a good way to 'serialize' the T1/T2/DT associative arrays for sending across the exec?
+	# there must be... surely one of those parameter expansion flags lets us print the associative array as a string that can be passed directly to exec or whatever
 else
+	T1[FLOCK]=$T1_FLOCK
 	t2 FLOCK
 	print_log notice "time spent waiting on flock: $(dt FLOCK 2)"
 fi
