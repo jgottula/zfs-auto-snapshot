@@ -64,7 +64,8 @@ SNAPSHOTS_OLD=''
 
 # Regex: valid characters for snapshot names (technically ' ' is okay, but we will disallow it)
 # See: lib/libzfs/libzfs_dataset.c, module/zcommon/zfs_namecheck.c
-RE_VALID='^[[:alnum:]-_.:]*$'
+RE_VALID_ANYLEN='^[[:alnum:]-_.:]*$'
+RE_VALID_SINGLE='^[[:alnum:]-_.:]$'
 
 
 typeset -A T1 T2 DT
@@ -385,7 +386,7 @@ do
 			shift 2
 			;;
 		(-l|--label)
-			if [[ ! "$2" =~ $RE_VALID ]]
+			if [[ ! "$2" =~ $RE_VALID_ANYLEN ]]
 			then
 				print_log error "The $1 parameter must be alphanumeric."
 				exit 202
@@ -403,7 +404,7 @@ do
 			shift 2
 			;;
 		(-p|--prefix)
-			if [[ ! "$2" =~ $RE_VALID ]]
+			if [[ ! "$2" =~ $RE_VALID_ANYLEN ]]
 			then
 				print_log error "The $1 parameter must be alphanumeric."
 				exit 130
@@ -426,7 +427,7 @@ do
 			then
 				print_log error "The $1 parameter must be non-empty."
 				exit 131
-			elif [[ ! "$2" =~ $RE_VALID ]]
+			elif [[ ! "$2" =~ $RE_VALID_SINGLE ]]
 			then
 				print_log error "The $1 parameter must be one alphanumeric character."
 				exit 132
