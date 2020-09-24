@@ -220,6 +220,32 @@ dt () # NAME PREC
 	fi
 }
 
+DT_LOG_LEVEL_NOFAIL=info    # if the threshold was not exceeded, still log, but at this reduced level
+DT_LOG_LEVEL_DEFAULT=notice # if the threshold was exceeded, log at this level unless otherwise specified
+
+dt_log_if_ge_msec_lvl () # NAME MSEC PREC LEVEL MSG
+{
+	[[ $# -eq 5 ]] || return # problem!
+	private NAME=$1 MSEC=$2 PREC=$3 LEVEL=$4 MSG="$5"
+
+	[[ -v DT[$NAME] ]] || return # problem!
+
+	private DT_MSEC=$(( DT[$NAME] / ( 10 ** ( 9 - 3 ) ) ))
+
+	# log in all cases, but at a lower level if the threshold was not exceeded
+	(( DT_MSEC >= MSEC )) || LEVEL=$DT_LOG_LEVEL_NOFAIL
+
+	print_log $LEVEL "$(printf "%s: %s" "$MSG" "$(dt $NAME $PREC)")"
+}
+
+dt_log_if_ge_msec() # NAME MSEC PREC MSG (LEVEL is defaulted to 'notice')
+{
+	[[ $# -eq 4 ]] || return # problem!
+	private NAME=$1 MSEC=$2 PREC=$3 MSG="$4"
+
+	dt_log_if_ge_msec_lvl $NAME $MSEC $PREC $DT_LOG_LEVEL_DEFAULT "$MSG"
+}
+
 
 do_run () # [argv]
 {
@@ -536,7 +562,7 @@ if [[ "$FLOCKER" != "$FLOCK_PATH" ]]; then
 else
 	T1[FLOCK]=$T1_FLOCK
 	t2 FLOCK
-	print_log notice "time spent waiting on flock: $(dt FLOCK 2)"
+	dt_log_if_ge_msec FLOCK 1000 2 "time spent waiting on flock"
 fi
 
 
@@ -557,17 +583,17 @@ t1 ZPOOL_STATUS
 ZPOOL_STATUS=$(env LC_ALL=C zpool status 2>&1 ) \
   || { print_log error "zpool status $?: $ZPOOL_STATUS"; exit 135; }
 t2 ZPOOL_STATUS
-print_log notice "time spent on 'zpool status': $(dt ZPOOL_STATUS 2)"
+dt_log_if_ge_msec ZPOOL_STATUS 1000 2 "time spent running 'zpool status'"
 
 
-t1 ZFS_LIST1
+t1 ZFS_LIST_DS
 ZFS_LIST=$(env LC_ALL=C zfs list -H -t filesystem,volume -s name \
   -o name,receive_resume_token,com.sun:auto-snapshot${opt_label:+,com.sun:auto-snapshot:"$opt_label"}) \
   || { print_log error "zfs list $?: $ZFS_LIST"; exit 136; }
-t2 ZFS_LIST1
-print_log notice "time spent on 'zfs list' (datasets): $(dt ZFS_LIST1 2)"
+t2 ZFS_LIST_DS
+dt_log_if_ge_msec ZFS_LIST_DS 15000 2 "time spent running 'zfs list' (datasets)"
 
-t1 ZFS_LIST2
+t1 ZFS_LIST_SNAP
 if [ -n "$opt_fast_zfs_list" ]
 then
 	SNAPSHOTS_OLD=($(env LC_ALL=C zfs list -H -t snapshot -o name -s name | \
@@ -578,8 +604,8 @@ else
 	SNAPSHOTS_OLD=($(env LC_ALL=C zfs list -H -t snapshot -S creation -o name)) \
 	  || { print_log error "zfs list $?: $SNAPSHOTS_OLD"; exit 137; }
 fi
-t2 ZFS_LIST2
-print_log notice "time spent on 'zfs list' (snapshots): $(dt ZFS_LIST2 2)"
+t2 ZFS_LIST_SNAP
+dt_log_if_ge_msec ZFS_LIST_SNAP 15000 2 "time spent running 'zfs list' (snapshots)"
 
 # Verify that each argument is a filesystem or volume.
 for ii in "$@"
@@ -813,12 +839,12 @@ test -n "$opt_dry_run" \
 t1 DO_SNAPS
 do_snapshots "$SNAPPROP" ""   "$SNAPNAME" "${TARGETS_REGULAR[@]}"
 t2 DO_SNAPS
-print_log notice "time spent doing snapshots (regular): $(dt DO_SNAPS 2)"
+dt_log_if_ge_msec DO_SNAPS 15000 2 "time spent in do_snapshots (regular)"
 
 t1 DO_SNAPS_R
 do_snapshots "$SNAPPROP" "-r" "$SNAPNAME" "${TARGETS_RECURSIVE[@]}"
 t2 DO_SNAPS_R
-print_log notice "time spent doing snapshots (recursive): $(dt DO_SNAPS_R 2)"
+dt_log_if_ge_msec DO_SNAPS_R 15000 2 "time spent in do_snapshots (recursive)"
 
 print_log notice "@$SNAPNAME," \
   "$SNAPSHOT_COUNT created," \
