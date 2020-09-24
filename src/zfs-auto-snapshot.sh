@@ -176,7 +176,7 @@ t1 () # NAME
 {
 	[[ $# -eq 1 ]] || return # problem!
 
-	T1[$1]=$(date -u '+%s%N')
+	typeset -g T1[$1]=$(date -u '+%s%N')
 }
 
 t2 () # NAME
@@ -185,13 +185,13 @@ t2 () # NAME
 
 	[[ -v T1[$1] ]] || return # problem!
 
-	T2[$1]=$(date -u '+%s%N')
+	typeset -g T2[$1]=$(date -u '+%s%N')
 
 	private DTI=$(( T2[$1] - T1[$1] )) # ; echo >&2 "t2: DTI=$DTI"
 	(( DTI >= 0 )) || (( DTI = 0 ))    # ; echo >&2 "t2: DTI=$DTI"
 
 	# accumulate globally, to allow doing [ t1...t2 t1...t2 t1...t2 dt ] with cumulative results
-	(( DT[$1] += DTI ))
+	typeset -g DT[$1]=$(( DT[$1] + DTI ))
 
 	unset "T1[$1]"
 	unset "T2[$1]"
