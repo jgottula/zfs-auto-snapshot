@@ -19,6 +19,8 @@
 # Place, Suite 330, Boston, MA  02111-1307  USA
 #
 
+zmodload zsh/param/private # zsh: 'private': better version of 'local' that doesn't let function callees see callers' locals
+
 # ZSH: enable PCRE regex
 set -o rematchpcre
 
@@ -75,7 +77,7 @@ t2 ()
 
 	T2[$1]=$(date -u '+%s%N')
 
-	local DTI=$(( T2[$1] - T1[$1] ))   # ; echo >&2 "t2: DTI=$DTI"
+	private DTI=$(( T2[$1] - T1[$1] )) # ; echo >&2 "t2: DTI=$DTI"
 	(( DTI >= 0 )) || (( DTI = 0 ))    # ; echo >&2 "t2: DTI=$DTI"
 
 	# accumulate globally, to allow doing [ t1...t2 t1...t2 t1...t2 dt ] with cumulative results
@@ -87,19 +89,19 @@ t2 ()
 
 dt ()
 {
-	local PREC=$2
+	private PREC=$2
 
 	[[ -v DT[$1] ]] || return # problem!
 
-	local DIV_NSEC=$(( 10 **   9          ))
-	local DIV_PREC=$(( 10 **       PREC   ))
-	local DIV_PINV=$(( 10 ** ( 9 - PREC ) ))
+	private DIV_NSEC=$(( 10 **   9          ))
+	private DIV_PREC=$(( 10 **       PREC   ))
+	private DIV_PINV=$(( 10 ** ( 9 - PREC ) ))
 
-	local DT_SEC_WHOL=$((   DT[$1] / DIV_NSEC              ))
-	local DT_SEC_FRAC=$(( ( DT[$1] / DIV_PINV ) % DIV_PREC ))
+	private DT_SEC_WHOL=$((   DT[$1] / DIV_NSEC              ))
+	private DT_SEC_FRAC=$(( ( DT[$1] / DIV_PINV ) % DIV_PREC ))
 
-	local DT_MIN=$(( DT_SEC_WHOL / 60 ))
-	local DT_SEC=$(( DT_SEC_WHOL % 60 ))
+	private DT_MIN=$(( DT_SEC_WHOL / 60 ))
+	private DT_SEC=$(( DT_SEC_WHOL % 60 ))
 
 	if (( $PREC > 0 )); then
 		printf '%u:%02u.%0*u\n' "$DT_MIN" "$DT_SEC" "$PREC" "$DT_SEC_FRAC"
@@ -143,10 +145,10 @@ Refer to the zfs-auto-snapshot(8) man page for additional information.
 
 print_log () # level, message, ...
 {
-	local LEVEL=$1
+	private LEVEL=$1
 	shift 1
 
-	local TAG="zfs-auto-snapshot"
+	private TAG="zfs-auto-snapshot"
 	[[ -n "$opt_label" ]] && TAG+="<$opt_label>"
 
 	case $LEVEL in
@@ -199,10 +201,10 @@ do_run () # [argv]
 	if [ -n "$opt_dry_run" ]
 	then
 		echo $*
-		local RC="$?"
+		private RC="$?"
 	else
 		eval $*
-		local RC="$?"
+		private RC="$?"
 		if [ "$RC" -eq '0' ]
 		then
 			print_log debug "$*"
@@ -216,12 +218,12 @@ do_run () # [argv]
 
 do_snapshots () # properties, flags, snapname, [targets...]
 {
-	local PROPS="$1"
-	local FLAGS="$2"
-	local NAME="$3"
-	local TARGETS=("${@:4}")
-	local KEEP=''
-	local RUNSNAP=1
+	private PROPS="$1"
+	private FLAGS="$2"
+	private NAME="$3"
+	private TARGETS=("${@:4}")
+	private KEEP=''
+	private RUNSNAP=1
 
 	# global DESTRUCTION_COUNT
 	# global SNAPSHOT_COUNT
@@ -232,20 +234,20 @@ do_snapshots () # properties, flags, snapname, [targets...]
 	# Here, we precompute RE_OLD_BASE, which contains the non-dataset-specific parts that won't change.
 	# We must escape any characters in the valid char set so they will still match literally.
 	# In practice, the only such character we need to worry about is '.'.
-	local RE_OLD_PREFIX=${opt_prefix:+$opt_prefix$opt_sep}
-	local RE_OLD_DATE='\d{4}-\d{2}-\d{2}-\d{4}'
-	local RE_OLD_LABEL=${opt_label:+$opt_sep$opt_label}
-	local RE_OLD_BASE=${RE_OLD_PREFIX//./\\.}${RE_OLD_DATE}${RE_OLD_LABEL//./\\.}
+	private RE_OLD_PREFIX=${opt_prefix:+$opt_prefix$opt_sep}
+	private RE_OLD_DATE='\d{4}-\d{2}-\d{2}-\d{4}'
+	private RE_OLD_LABEL=${opt_label:+$opt_sep$opt_label}
+	private RE_OLD_BASE=${RE_OLD_PREFIX//./\\.}${RE_OLD_DATE}${RE_OLD_LABEL//./\\.}
 
-	local ii
+	private ii
 	for ii in "${TARGETS[@]}"
 	do
 		# Check if size check is > 0
-		local size_check_skip=0
+		private size_check_skip=0
 		if [ "$opt_min_size" -gt 0 ]
 		then
-			local bytes_written=`zfs get -Hp -o value written $ii`
-			local kb_written=$(( $bytes_written / 1024 ))
+			private bytes_written=`zfs get -Hp -o value written $ii`
+			private kb_written=$(( $bytes_written / 1024 ))
 			if [ "$kb_written" -lt "$opt_min_size" ]
 			then
 				size_check_skip=1
@@ -277,7 +279,7 @@ do_snapshots () # properties, flags, snapname, [targets...]
 		test -z "$opt_keep" && continue
 		KEEP="$opt_keep"
 
-		local RE_OLD='^'${ii//./\\.}'@'${RE_OLD_BASE}'$'
+		private RE_OLD='^'${ii//./\\.}'@'${RE_OLD_BASE}'$'
 
 		# ASSERT: The old snapshot list is sorted by increasing age.
 		for jj in "${SNAPSHOTS_OLD[@]}"
