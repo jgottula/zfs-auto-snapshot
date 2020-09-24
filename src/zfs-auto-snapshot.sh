@@ -21,8 +21,11 @@
 
 zmodload zsh/param/private # zsh: 'private': better version of 'local' that doesn't let function callees see callers' locals
 
-# ZSH: enable PCRE regex
-set -o rematchpcre
+setopt c_bases            # zsh: print non-decimal numbers (hex) like real C programmers, dammit
+setopt rematch_pcre       # zsh: use PCRE syntax for regex
+setopt local_loops        # zsh: warn and disallow break/continue across function scopes
+setopt warn_create_global # zsh: warn when functions create new global vars
+setopt warn_nested_var    # zsh: warn when functions assign to global vars or local vars from outer functions etc
 
 # Set the field separator to a literal tab and newline.
 IFS="	
