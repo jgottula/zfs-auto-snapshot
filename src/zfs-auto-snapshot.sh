@@ -68,53 +68,6 @@ RE_VALID_ANYLEN='^[[:alnum:]-_.:]*$'
 RE_VALID_SINGLE='^[[:alnum:]-_.:]$'
 
 
-typeset -A T1 T2 DT
-
-t1 ()
-{
-	T1[$1]=$(date -u '+%s%N')
-}
-
-t2 ()
-{
-	[[ -v T1[$1] ]] || return # problem!
-
-	T2[$1]=$(date -u '+%s%N')
-
-	private DTI=$(( T2[$1] - T1[$1] )) # ; echo >&2 "t2: DTI=$DTI"
-	(( DTI >= 0 )) || (( DTI = 0 ))    # ; echo >&2 "t2: DTI=$DTI"
-
-	# accumulate globally, to allow doing [ t1...t2 t1...t2 t1...t2 dt ] with cumulative results
-	(( DT[$1] += DTI ))
-
-	unset "T1[$1]"
-	unset "T2[$1]"
-}
-
-dt ()
-{
-	private PREC=$2
-
-	[[ -v DT[$1] ]] || return # problem!
-
-	private DIV_NSEC=$(( 10 **   9          ))
-	private DIV_PREC=$(( 10 **       PREC   ))
-	private DIV_PINV=$(( 10 ** ( 9 - PREC ) ))
-
-	private DT_SEC_WHOL=$((   DT[$1] / DIV_NSEC              ))
-	private DT_SEC_FRAC=$(( ( DT[$1] / DIV_PINV ) % DIV_PREC ))
-
-	private DT_MIN=$(( DT_SEC_WHOL / 60 ))
-	private DT_SEC=$(( DT_SEC_WHOL % 60 ))
-
-	if (( $PREC > 0 )); then
-		printf '%u:%02u.%0*u\n' "$DT_MIN" "$DT_SEC" "$PREC" "$DT_SEC_FRAC"
-	else
-		printf '%u:%02u\n' "$DT_MIN" "$DT_SEC"
-	fi
-}
-
-
 print_usage ()
 {
 	echo "Usage: zfs-auto-snapshot [options] [-l label] <'//' | name [name...]>
@@ -197,6 +150,53 @@ print_log () # level, message, ...
 				{ [[ -z "$opt_quiet" ]] && echo $* 1>&2 ; }
 			;;
 	esac
+}
+
+
+typeset -A T1 T2 DT
+
+t1 ()
+{
+	T1[$1]=$(date -u '+%s%N')
+}
+
+t2 ()
+{
+	[[ -v T1[$1] ]] || return # problem!
+
+	T2[$1]=$(date -u '+%s%N')
+
+	private DTI=$(( T2[$1] - T1[$1] )) # ; echo >&2 "t2: DTI=$DTI"
+	(( DTI >= 0 )) || (( DTI = 0 ))    # ; echo >&2 "t2: DTI=$DTI"
+
+	# accumulate globally, to allow doing [ t1...t2 t1...t2 t1...t2 dt ] with cumulative results
+	(( DT[$1] += DTI ))
+
+	unset "T1[$1]"
+	unset "T2[$1]"
+}
+
+dt ()
+{
+	private PREC=$2
+
+	[[ -v DT[$1] ]] || return # problem!
+
+	private DIV_NSEC=$(( 10 **   9          ))
+	private DIV_PREC=$(( 10 **       PREC   ))
+	private DIV_PINV=$(( 10 ** ( 9 - PREC ) ))
+
+	private DT_SEC_WHOL=$((   DT[$1] / DIV_NSEC              ))
+	private DT_SEC_FRAC=$(( ( DT[$1] / DIV_PINV ) % DIV_PREC ))
+
+	private DT_MIN=$(( DT_SEC_WHOL / 60 ))
+	private DT_SEC=$(( DT_SEC_WHOL % 60 ))
+
+	if (( $PREC > 0 )); then
+		printf '%u:%02u.%0*u\n' "$DT_MIN" "$DT_SEC" "$PREC" "$DT_SEC_FRAC"
+	else
+		printf '%u:%02u\n' "$DT_MIN" "$DT_SEC"
+	fi
 }
 
 
@@ -309,6 +309,14 @@ do_snapshots () # properties, flags, snapname, [targets...]
 
 # main ()
 # {
+
+# ISO style date; fifteen characters: YYYY-MM-DD-HHMM
+# On Solaris %H%M expands to 12h34.
+# We use the shortform -u here because --utc is not supported on macos.
+# NOTE: we now grab this BEFORE running any time-consuming zpool/zfs commands!
+#       (and actually also BEFORE we do the flock stuff as well... slightly sketchy but nicer looking at least...)
+# NOTE: we set DATE_PRELOCK here (twice actually); but when we're flock'd, DATE will be pre-set in the environment
+DATE_PRELOCK=$(date -u +%F-%H%M)
 
 # Save the original command line parameters, because we will parse them twice:
 # once before taking the flock, and then again once holding the flock
@@ -483,14 +491,6 @@ then
 fi
 
 
-# ISO style date; fifteen characters: YYYY-MM-DD-HHMM
-# On Solaris %H%M expands to 12h34.
-# We use the shortform -u here because --utc is not supported on macos.
-# NOTE: we now grab this BEFORE running any time-consuming zpool/zfs commands!
-#       (and actually also BEFORE we do the flock stuff as well... slightly sketchy but nicer looking at least...)
-# NOTE: we set DATE_PRELOCK here (twice actually); but when we're flock'd, DATE will be pre-set in the environment
-DATE_PRELOCK=$(date -u +%F-%H%M)
-
 # We use a per-label flock: this means that instances can run in parallel, so long as they are for different labels
 # If a label is specified: /var/lock/zfs-auto-snapshot-LABEL
 # Otherwise:               /var/lock/zfs-auto-snapshot
@@ -514,7 +514,7 @@ fi
 ##########################################################################################################
 ##########################################################################################################
 ##                                                                                                      ##
-##  file-level code above this point is executed WITHOUT flock; below is executed with the flock HELD!  ##
+##  file-scope code above this point is executed WITHOUT flock; below is executed with the flock HELD!  ##
 ##                                                                                                      ##
 ##########################################################################################################
 ##########################################################################################################
