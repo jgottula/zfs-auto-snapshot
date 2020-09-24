@@ -40,6 +40,7 @@ opt_event_is_set=''
 opt_event=''
 opt_fast_zfs_list=''
 opt_keep=''
+opt_label_is_parsed=''
 opt_label=''
 opt_prefix='auto'
 opt_recursive=''
@@ -111,8 +112,17 @@ print_log () # level, message, ...
 	private LEVEL=$1
 	shift 1
 
-	private TAG="zfs-auto-snapshot"
-	[[ -n "$opt_label" ]] && TAG+="<$opt_label>"
+	# Command name shortened for brevity: journal entry lines are long enough already!
+	private TAG="zfs-auto-snap<$DATE_LOG>"
+
+	# Add the label, if one was specified; and avoid ambiguity if we just haven't parsed it yet
+	if [[ -n "$opt_label" ]]; then
+		TAG+="<$opt_label>" # we do have a label
+	elif [[ -n "$opt_label_is_parsed" ]]; then
+		: # done parsing options; no label specified
+	else
+		TAG+="<???>" # no label, and don't know yet if we will or not
+	fi
 
 	case $LEVEL in
 		(eme*)
@@ -326,6 +336,9 @@ fi
 # ISO style date; fifteen characters: YYYY-MM-DD-HHMM
 DATE="$(date --utc --date="@$DATE_RAW" +'%04Y-%02m-%02d-%02H%02M')"
 
+# Non-UTC time-only identifier, to help differentiate between log messages from different instances of zfs-auto-snapshot
+DATE_LOG="$(date --date="@$DATE_RAW" +'%02H:%02M')"
+
 # Save the original command line parameters, because we will parse them twice:
 # once before taking the flock, and then again once holding the flock
 # (this is messy, but it's necessary for stuff like --help to work immediately without blocking on the flock)
@@ -408,6 +421,7 @@ do
 				exit 202
 			fi
 			opt_label="$2"
+			opt_label_is_parsed='1'
 			shift 2
 			;;
 		(-m|--min-size)
@@ -478,6 +492,8 @@ do
 			;;
 	esac
 done
+
+opt_label_is_parsed='1'
 
 if [ "$#" -eq '0' ]
 then
