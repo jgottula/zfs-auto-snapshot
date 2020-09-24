@@ -38,7 +38,6 @@ opt_default_include=''
 opt_dry_run=''
 opt_event_is_set=''
 opt_event=''
-opt_fast_zfs_list=''
 opt_keep=''
 opt_label_is_parsed=''
 opt_label=''
@@ -82,7 +81,7 @@ print_usage ()
   --default-include  Include datasets if com.sun:auto-snapshot is unset.
   -d, --debug        Print debugging messages.
   -e, --event=EVENT  Set the com.sun:auto-snapshot-desc property to EVENT.
-      --fast         Use a faster zfs list invocation.
+      --fast         Use a faster zfs list invocation. [OBSOLETE]
   -n, --dry-run      Print actions without actually doing anything.
   -s, --skip-scrub   Do not snapshot filesystems in scrubbing pools.
       --skip-recv    Skip datasets that are being received with resume token.
@@ -417,7 +416,7 @@ do
 			shift 2
 			;;
 		(--fast)
-			opt_fast_zfs_list='1'
+			# deprecated ignored option
 			shift 1
 			;;
 		(-n|--dry-run)
@@ -594,16 +593,10 @@ t2 ZFS_LIST_DS
 dt_log_if_ge_msec ZFS_LIST_DS 15000 2 "time spent running 'zfs list' (datasets)"
 
 t1 ZFS_LIST_SNAP
-if [ -n "$opt_fast_zfs_list" ]
-then
-	SNAPSHOTS_OLD=($(env LC_ALL=C zfs list -H -t snapshot -o name -s name | \
-	  grep -P '@'"${opt_prefix:+${opt_prefix//./\\.}${opt_sep//./\\.}}"'\d{4}-\d{2}-\d{2}-\d{4}'"${opt_label:+${opt_sep//./\\.}${opt_label//./\\.}}"'$' | \
-	  sort -t'@' -k2r,2 -k1,1)) \
-	  || { print_log error "zfs list $?: $SNAPSHOTS_OLD"; exit 137; }
-else
-	SNAPSHOTS_OLD=($(env LC_ALL=C zfs list -H -t snapshot -S creation -o name)) \
-	  || { print_log error "zfs list $?: $SNAPSHOTS_OLD"; exit 137; }
-fi
+SNAPSHOTS_OLD=($(env LC_ALL=C zfs list -H -t snapshot -o name -s name | \
+  grep -P '@'"${opt_prefix:+${opt_prefix//./\\.}${opt_sep//./\\.}}"'\d{4}-\d{2}-\d{2}-\d{4}'"${opt_label:+${opt_sep//./\\.}${opt_label//./\\.}}"'$' | \
+  sort -t'@' -k2r,2 -k1,1)) \
+  || { print_log error "zfs list $?: $SNAPSHOTS_OLD"; exit 137; }
 t2 ZFS_LIST_SNAP
 dt_log_if_ge_msec ZFS_LIST_SNAP 15000 2 "time spent running 'zfs list' (snapshots)"
 
