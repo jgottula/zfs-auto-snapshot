@@ -53,6 +53,7 @@ opt_pre_snapshot=''
 opt_post_snapshot=''
 opt_do_snapshots=1
 opt_min_size=0
+opt_no_flock=''
 
 # Global summary statistics.
 DESTRUCTION_COUNT='0'
@@ -98,6 +99,7 @@ print_usage ()
   -v, --verbose      Print info messages.
       --destroy-only Only destroy older snapshots, do not create new ones.
       --min-size=MIN Snapshot only if >= MIN KiB written since prior snapshot.
+      --no-flock     Don't call flock(1) for mutual exclusion. USE WITH CARE!
       name           Filesystem and volume names, or '//' for all ZFS datasets.
 
 Refer to the zfs-auto-snapshot(8) man page for additional information.
@@ -385,7 +387,7 @@ GETOPT=$($GETOPT_BIN \
   --longoptions=event:,keep:,label:,prefix:,sep: \
   --longoptions=debug,help,quiet,syslog,verbose \
   --longoptions=pre-snapshot:,post-snapshot:,destroy-only \
-  --longoptions=min-size: \
+  --longoptions=min-size:,no-flock \
   --options=dnshe:l:k:p:rs:qgvm: \
   -- "$@" ) \
   || exit 128
@@ -516,6 +518,10 @@ do
 			opt_do_snapshots=''
 			shift 1
 			;;
+		(--no-flock)
+			opt_no_flock='1'
+			shift 1
+			;;
 		(--)
 			shift 1
 			break
@@ -545,23 +551,26 @@ then
 fi
 
 
-# We use a per-label flock: this means that instances can run in parallel, so long as they are for different labels
-# If a label is specified: /var/lock/zfs-auto-snapshot-LABEL
-# Otherwise:               /var/lock/zfs-auto-snapshot
-FLOCK_PATH="/var/lock/zfs-auto-snapshot${opt_label:+-$opt_label}"
+# Don't flock if we were specifically requested not to (yikes)
+if [[ -z "$opt_no_flock" ]]; then
+	# We use a per-label flock: this means that instances can run in parallel, so long as they are for different labels
+	# If a label is specified: /var/lock/zfs-auto-snapshot-LABEL
+	# Otherwise:               /var/lock/zfs-auto-snapshot
+	FLOCK_PATH="/var/lock/zfs-auto-snapshot${opt_label:+-$opt_label}"
 
-# Only allow one instance of zfs-auto-snapshot, per-label, to run (besides option parsing) at any given time
-# (to avoid possible race conditions due to multiple different runs with the same 'label' happening at once)
-# NOTE: this is an adaptation of the example code straight out of 'man 1 flock'
-if [[ "$FLOCKER" != "$FLOCK_PATH" ]]; then
-	t1 FLOCK
-	exec env FLOCKER="$FLOCK_PATH" DATE_RAW="$DATE_RAW" T1_FLOCK="$T1[FLOCK]" flock --exclusive "$FLOCK_PATH" "$0" "${ARGS_PRELOCK[@]}"
-	# TODO: is there a good way to 'serialize' the T1/T2/DT associative arrays for sending across the exec?
-	# there must be... surely one of those parameter expansion flags lets us print the associative array as a string that can be passed directly to exec or whatever
-else
-	T1[FLOCK]=$T1_FLOCK
-	t2 FLOCK
-	dt_log_if_ge_msec FLOCK 1000 2 "time spent waiting on flock"
+	# Only allow one instance of zfs-auto-snapshot, per-label, to run (besides option parsing) at any given time
+	# (to avoid possible race conditions due to multiple different runs with the same 'label' happening at once)
+	# NOTE: this is an adaptation of the example code straight out of 'man 1 flock'
+	if [[ "$FLOCKER" != "$FLOCK_PATH" ]]; then
+		t1 FLOCK
+		exec env FLOCKER="$FLOCK_PATH" DATE_RAW="$DATE_RAW" T1_FLOCK="$T1[FLOCK]" flock --exclusive "$FLOCK_PATH" "$0" "${ARGS_PRELOCK[@]}"
+		# TODO: is there a good way to 'serialize' the T1/T2/DT associative arrays for sending across the exec?
+		# there must be... surely one of those parameter expansion flags lets us print the associative array as a string that can be passed directly to exec or whatever
+	else
+		T1[FLOCK]=$T1_FLOCK
+		t2 FLOCK
+		dt_log_if_ge_msec FLOCK 1000 2 "time spent waiting on flock"
+	fi
 fi
 
 
