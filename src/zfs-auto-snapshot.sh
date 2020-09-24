@@ -792,12 +792,20 @@ do
 done
 
 t1 ZFS_LIST_SNAP
-SNAPSHOTS_OLD=($(env LC_ALL=C zfs list -H -t snapshot -o name -s name | \
+SNAPSHOTS_OLD=($(env LC_ALL=C zfs list -H -t snapshot -o name -s name -d 1 ${TARGETS_REGULAR[@]} | \
   grep -P '@'"${opt_prefix:+${opt_prefix//./\\.}${opt_sep//./\\.}}"'\d{4}-\d{2}-\d{2}-\d{4}'"${opt_label:+${opt_sep//./\\.}${opt_label//./\\.}}"'$' | \
   sort -t'@' -k2r,2 -k1,1)) \
   || { print_log error "zfs list $?: $SNAPSHOTS_OLD"; exit 137; }
 t2 ZFS_LIST_SNAP
-dt_log_if_ge_msec ZFS_LIST_SNAP 15000 2 "time spent running 'zfs list' (snapshots)"
+dt_log_if_ge_msec ZFS_LIST_SNAP 15000 2 "time spent running 'zfs list' (snaps: regular)"
+
+t1 ZFS_LIST_SNAP_R
+SNAPSHOTS_OLD+=($(env LC_ALL=C zfs list -H -t snapshot -o name -s name -r ${TARGETS_RECURSIVE[@]} | \
+  grep -P '@'"${opt_prefix:+${opt_prefix//./\\.}${opt_sep//./\\.}}"'\d{4}-\d{2}-\d{2}-\d{4}'"${opt_label:+${opt_sep//./\\.}${opt_label//./\\.}}"'$' | \
+  sort -t'@' -k2r,2 -k1,1)) \
+  || { print_log error "zfs list $?: $SNAPSHOTS_OLD"; exit 137; }
+t2 ZFS_LIST_SNAP_R
+dt_log_if_ge_msec ZFS_LIST_SNAP_R 15000 2 "time spent running 'zfs list' (snaps: recursive)"
 
 # Only actually set the com.sun:auto-snapshot-desc property if we were
 # explicitly given a value to use (which can be ''); otherwise, don't set it.
