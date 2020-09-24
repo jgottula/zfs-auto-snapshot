@@ -584,21 +584,12 @@ ZPOOL_STATUS=$(env LC_ALL=C zpool status 2>&1 ) \
 t2 ZPOOL_STATUS
 dt_log_if_ge_msec ZPOOL_STATUS 1000 2 "time spent running 'zpool status'"
 
-
 t1 ZFS_LIST_DS
 ZFS_LIST=$(env LC_ALL=C zfs list -H -t filesystem,volume -s name \
   -o name,receive_resume_token,com.sun:auto-snapshot${opt_label:+,com.sun:auto-snapshot:"$opt_label"}) \
   || { print_log error "zfs list $?: $ZFS_LIST"; exit 136; }
 t2 ZFS_LIST_DS
 dt_log_if_ge_msec ZFS_LIST_DS 15000 2 "time spent running 'zfs list' (datasets)"
-
-t1 ZFS_LIST_SNAP
-SNAPSHOTS_OLD=($(env LC_ALL=C zfs list -H -t snapshot -o name -s name | \
-  grep -P '@'"${opt_prefix:+${opt_prefix//./\\.}${opt_sep//./\\.}}"'\d{4}-\d{2}-\d{2}-\d{4}'"${opt_label:+${opt_sep//./\\.}${opt_label//./\\.}}"'$' | \
-  sort -t'@' -k2r,2 -k1,1)) \
-  || { print_log error "zfs list $?: $SNAPSHOTS_OLD"; exit 137; }
-t2 ZFS_LIST_SNAP
-dt_log_if_ge_msec ZFS_LIST_SNAP 15000 2 "time spent running 'zfs list' (snapshots)"
 
 # Verify that each argument is a filesystem or volume.
 for ii in "$@"
@@ -790,6 +781,14 @@ do
 	print_log debug "Including $ii for recursive snapshot."
 	TARGETS_RECURSIVE+=("$ii")
 done
+
+t1 ZFS_LIST_SNAP
+SNAPSHOTS_OLD=($(env LC_ALL=C zfs list -H -t snapshot -o name -s name | \
+  grep -P '@'"${opt_prefix:+${opt_prefix//./\\.}${opt_sep//./\\.}}"'\d{4}-\d{2}-\d{2}-\d{4}'"${opt_label:+${opt_sep//./\\.}${opt_label//./\\.}}"'$' | \
+  sort -t'@' -k2r,2 -k1,1)) \
+  || { print_log error "zfs list $?: $SNAPSHOTS_OLD"; exit 137; }
+t2 ZFS_LIST_SNAP
+dt_log_if_ge_msec ZFS_LIST_SNAP 15000 2 "time spent running 'zfs list' (snapshots)"
 
 # Only actually set the com.sun:auto-snapshot-desc property if we were
 # explicitly given a value to use (which can be ''); otherwise, don't set it.
