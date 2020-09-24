@@ -171,13 +171,17 @@ print_log () # level, message, ...
 
 typeset -A T1 T2 DT
 
-t1 ()
+t1 () # NAME
 {
+	[[ $# -eq 1 ]] || return # problem!
+
 	T1[$1]=$(date -u '+%s%N')
 }
 
-t2 ()
+t2 () # NAME
 {
+	[[ $# -eq 1 ]] || return # problem!
+
 	[[ -v T1[$1] ]] || return # problem!
 
 	T2[$1]=$(date -u '+%s%N')
@@ -192,8 +196,9 @@ t2 ()
 	unset "T2[$1]"
 }
 
-dt ()
+dt () # NAME PREC
 {
+	[[ $# -eq 2 ]] || return # problem!
 	private PREC=$2
 
 	[[ -v DT[$1] ]] || return # problem!
