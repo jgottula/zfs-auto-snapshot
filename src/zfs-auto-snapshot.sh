@@ -68,6 +68,12 @@ RE_VALID_ANYLEN='^[[:alnum:]-_.:]*$'
 RE_VALID_SINGLE='^[[:alnum:]-_.:]$'
 
 
+# NOTE: these functions merely check whether the FLOCKER var has been set; they do not validate its value
+#       (so it's good for a rough/coarse state check, but NOT as a truly comprehensive validation)
+flock_pre  () { [[ ! -v FLOCKER ]] }
+flock_post () { [[   -v FLOCKER ]] }
+
+
 print_usage ()
 {
 	echo "Usage: zfs-auto-snapshot [options] [-l label] <'//' | name [name...]>
@@ -310,13 +316,15 @@ do_snapshots () # properties, flags, snapname, [targets...]
 # main ()
 # {
 
+# NOTE: we now grab the date/time BEFORE running any time-consuming zpool/zfs commands!
+#       (and actually also BEFORE doing basically literally anything else, including flock, so we can use it in log messages)
+# NOTE: in the post-flock case, DATE_RAW will already have been set to its pre-flock value
+if flock_pre; then
+	DATE_RAW="$(date +'%s')"
+fi
+
 # ISO style date; fifteen characters: YYYY-MM-DD-HHMM
-# On Solaris %H%M expands to 12h34.
-# We use the shortform -u here because --utc is not supported on macos.
-# NOTE: we now grab this BEFORE running any time-consuming zpool/zfs commands!
-#       (and actually also BEFORE we do the flock stuff as well... slightly sketchy but nicer looking at least...)
-# NOTE: we set DATE_PRELOCK here (twice actually); but when we're flock'd, DATE will be pre-set in the environment
-DATE_PRELOCK=$(date -u +%F-%H%M)
+DATE="$(date --utc --date="@$DATE_RAW" +'%04Y-%02m-%02d-%02H%02M')"
 
 # Save the original command line parameters, because we will parse them twice:
 # once before taking the flock, and then again once holding the flock
@@ -501,7 +509,7 @@ FLOCK_PATH="/var/lock/zfs-auto-snapshot${opt_label:+-$opt_label}"
 # NOTE: this is an adaptation of the example code straight out of 'man 1 flock'
 if [[ "$FLOCKER" != "$FLOCK_PATH" ]]; then
 	t1 FLOCK
-	exec env FLOCKER="$FLOCK_PATH" DATE="$DATE_PRELOCK" T1_FLOCK="$T1[FLOCK]" flock --exclusive "$FLOCK_PATH" "$0" "${ARGS_PRELOCK[@]}"
+	exec env FLOCKER="$FLOCK_PATH" DATE_RAW="$DATE_RAW" T1_FLOCK="$T1[FLOCK]" flock --exclusive "$FLOCK_PATH" "$0" "${ARGS_PRELOCK[@]}"
 	# TODO: is there a good way to 'serialize' the T1/T2/DT associative arrays for sending across the exec?
 	# there must be... surely one of those parameter expansion flags lets us print the associative array as a string that can be passed directly to exec or whatever
 else
