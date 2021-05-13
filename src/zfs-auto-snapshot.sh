@@ -864,10 +864,11 @@ do_snapshots "$SNAPPROP" "-r" "$SNAPNAME" "${TARGETS_RECURSIVE[@]}"
 t2 DO_SNAPS_R
 dt_log_if_ge_msec DO_SNAPS_R 15000 2 "time spent in do_snapshots (recursive)"
 
-print_log notice "@$SNAPNAME," \
-  "$SNAPSHOT_COUNT created," \
-  "$DESTRUCTION_COUNT destroyed," \
-  "$WARNING_COUNT warnings."
+if (( WARNING_COUNT == 0 )); then
+	print_log notice "@$SNAPNAME: +$SNAPSHOT_COUNT -$DESTRUCTION_COUNT"
+else
+	print_log notice "@$SNAPNAME: +$SNAPSHOT_COUNT -$DESTRUCTION_COUNT [$WARNING_COUNT warnings]"
+fi
 
 exit 0
 # }
