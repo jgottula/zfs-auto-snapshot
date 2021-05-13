@@ -224,11 +224,15 @@ dt () # NAME PREC
 	fi
 }
 
+DT_LOG_SUPPRESS='1' # TODO: make this an actual script option
+
 DT_LOG_LEVEL_NOFAIL=info    # if the threshold was not exceeded, still log, but at this reduced level
 DT_LOG_LEVEL_DEFAULT=notice # if the threshold was exceeded, log at this level unless otherwise specified
 
 dt_log_if_ge_msec_lvl () # NAME MSEC PREC LEVEL MSG
 {
+	[[ -n "$DT_LOG_SUPPRESS" ]] && return
+
 	[[ $# -eq 5 ]] || return # problem!
 	private NAME=$1 MSEC=$2 PREC=$3 LEVEL=$4 MSG="$5"
 
@@ -244,6 +248,8 @@ dt_log_if_ge_msec_lvl () # NAME MSEC PREC LEVEL MSG
 
 dt_log_if_ge_msec() # NAME MSEC PREC MSG (LEVEL is defaulted to 'notice')
 {
+	[[ -n "$DT_LOG_SUPPRESS" ]] && return
+
 	[[ $# -eq 4 ]] || return # problem!
 	private NAME=$1 MSEC=$2 PREC=$3 MSG="$4"
 
